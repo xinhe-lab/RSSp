@@ -1,0 +1,14 @@
+Package: RSSp
+Type: Package
+Title: What the package does (short line)
+Version: 1.0
+Date: 2017-08-07
+Author: Who wrote it
+Maintainer: Who to complain to <yourfault@somewhere.net>
+Description: More about what it does (maybe more than one line)
+License: What license is it under?
+Imports: Rcpp (>= 0.12.12), RcppEigen (>= 0.3.3.3.0),StanHeaders,BH
+LinkingTo: Rcpp, RcppEigen,StanHeaders,BH
+Remotes: CreRecombinase/RSSReQTL, CreRecombinase/RSSReQTL
+Suggests: testthat
+RoxygenNote: 6.0.1
