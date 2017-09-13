@@ -32,6 +32,20 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// evd_dnorm_step
+Eigen::ArrayXd evd_dnorm_step(const Eigen::Map<Eigen::ArrayXd> par, const Eigen::Map<Eigen::ArrayXd> dvec, const Eigen::Map<Eigen::ArrayXd> quh, const double step_size);
+RcppExport SEXP _RSSp_evd_dnorm_step(SEXP parSEXP, SEXP dvecSEXP, SEXP quhSEXP, SEXP step_sizeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::ArrayXd> >::type par(parSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::ArrayXd> >::type dvec(dvecSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::ArrayXd> >::type quh(quhSEXP);
+    Rcpp::traits::input_parameter< const double >::type step_size(step_sizeSEXP);
+    rcpp_result_gen = Rcpp::wrap(evd_dnorm_step(par, dvec, quh, step_size));
+    return rcpp_result_gen;
+END_RCPP
+}
 // evd_dnorm_grad_stan
 Eigen::ArrayXd evd_dnorm_grad_stan(const Eigen::Map<Eigen::ArrayXd> par, const Eigen::Map<Eigen::ArrayXd> dvec, const Eigen::Map<Eigen::ArrayXd> quh);
 RcppExport SEXP _RSSp_evd_dnorm_grad_stan(SEXP parSEXP, SEXP dvecSEXP, SEXP quhSEXP) {
@@ -42,6 +56,23 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::ArrayXd> >::type dvec(dvecSEXP);
     Rcpp::traits::input_parameter< const Eigen::Map<Eigen::ArrayXd> >::type quh(quhSEXP);
     rcpp_result_gen = Rcpp::wrap(evd_dnorm_grad_stan(par, dvec, quh));
+    return rcpp_result_gen;
+END_RCPP
+}
+// simuh_dir_cpp
+Eigen::MatrixXd simuh_dir_cpp(double sigu, double bias, int nreps, Eigen::MatrixXd& Q, Eigen::ArrayXd& D, Rcpp::StringVector fgeneids, Eigen::MatrixXd usim);
+RcppExport SEXP _RSSp_simuh_dir_cpp(SEXP siguSEXP, SEXP biasSEXP, SEXP nrepsSEXP, SEXP QSEXP, SEXP DSEXP, SEXP fgeneidsSEXP, SEXP usimSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< double >::type sigu(siguSEXP);
+    Rcpp::traits::input_parameter< double >::type bias(biasSEXP);
+    Rcpp::traits::input_parameter< int >::type nreps(nrepsSEXP);
+    Rcpp::traits::input_parameter< Eigen::MatrixXd& >::type Q(QSEXP);
+    Rcpp::traits::input_parameter< Eigen::ArrayXd& >::type D(DSEXP);
+    Rcpp::traits::input_parameter< Rcpp::StringVector >::type fgeneids(fgeneidsSEXP);
+    Rcpp::traits::input_parameter< Eigen::MatrixXd >::type usim(usimSEXP);
+    rcpp_result_gen = Rcpp::wrap(simuh_dir_cpp(sigu, bias, nreps, Q, D, fgeneids, usim));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -92,7 +123,9 @@ END_RCPP
 static const R_CallMethodDef CallEntries[] = {
     {"_RSSp_evd_dnorm", (DL_FUNC) &_RSSp_evd_dnorm, 3},
     {"_RSSp_evd_dnorm_grad", (DL_FUNC) &_RSSp_evd_dnorm_grad, 3},
+    {"_RSSp_evd_dnorm_step", (DL_FUNC) &_RSSp_evd_dnorm_step, 4},
     {"_RSSp_evd_dnorm_grad_stan", (DL_FUNC) &_RSSp_evd_dnorm_grad_stan, 3},
+    {"_RSSp_simuh_dir_cpp", (DL_FUNC) &_RSSp_simuh_dir_cpp, 7},
     {"_RSSp_rcppeigen_hello_world", (DL_FUNC) &_RSSp_rcppeigen_hello_world, 0},
     {"_RSSp_rcppeigen_outerproduct", (DL_FUNC) &_RSSp_rcppeigen_outerproduct, 1},
     {"_RSSp_rcppeigen_innerproduct", (DL_FUNC) &_RSSp_rcppeigen_innerproduct, 1},

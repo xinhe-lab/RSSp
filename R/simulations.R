@@ -2,6 +2,7 @@
 
 
 gen_tparamdf_norm <- function(pve, bias = 0, nreps, n, p,fgeneid=NULL){
+  library(dplyr)
   tfgeneid <- fgeneid
   stopifnot(nreps>0)
   if(length(nreps)>1){
@@ -45,8 +46,16 @@ parse_ldsc_h2log <- function(h2lf){
 
 
 
+sim_uh_A <- function(sigu,bias,Q,D,fgeneids,usim){
+  nd <- sigu^2*D^2+D+bias
+  A <- Q %*% (t(Q) * sqrt(pmax(nd, 0)))
+  uhmat <- t(usim%*%A)
+  colnames(uhmat) <- fgeneids
+  return(uhmat)
+}
 
-simuh_dir <-  function(sigu,bias,Q,D,fgeneids,seed=NULL,chr=NULL,range_id=NULL,gen_quh=F,ret_d=F){
+
+simuh_dir <-  function(sigu,bias,Q,D,fgeneids,seed=NULL,gen_quh=F){
   p <- nrow(Q)
   if(!is.null(seed)){
     stopifnot(is.integer(seed))
@@ -54,17 +63,13 @@ simuh_dir <-  function(sigu,bias,Q,D,fgeneids,seed=NULL,chr=NULL,range_id=NULL,g
   }
   nreps <- length(fgeneids[[1]])
   fgeneids <- as.character(fgeneids[[1]])
-  nd <- sigu^2*D^2+D+bias
-  #  A <- Q%*%diag(sqrt(nd))
-  A <- Q %*% (t(Q) * sqrt(pmax(nd, 0)))
+
+
   usim <- matrix(rnorm(n = p*nreps),nrow=nreps,byrow = T)
-  uhmat <- t(usim%*%A)
+  uhmat <- sim_uh_A(sigu,bias,Q,D,fgeneids,usim)
   if(gen_quh){
     quhmat <- crossprod(Q,uhmat)
   }
-
-  # mcov <- sigu^2*Rsq+R+bias*diag(p)
-  # uhmat <- t(mvtnorm::rmvnorm(n = nreps,mean = rep(0,p),sigma = mcov))
   
   colnames(uhmat) <- fgeneids
   if(gen_quh){
@@ -74,20 +79,16 @@ simuh_dir <-  function(sigu,bias,Q,D,fgeneids,seed=NULL,chr=NULL,range_id=NULL,g
   if(gen_quh){  
     retdf <- as_data_frame(quhmat) %>% mutate(snp_index=as.character(1:n())) %>% gather(fgeneid,quh,-snp_index) %>% mutate(tsigu=sigu,tbias=bias) %>% inner_join(retdf,by=c("snp_index","fgeneid","tsigu","tbias"))
   }
-  if(!is.null(range_id)){
-    retdf <- mutate(retdf,range_id=range_id)
-  }
-  if(!is.null(chr)){
-    retdf <- mutate(retdf,chrom=chr)
-  }
-  if(ret_d){
-    retdf <- data_frame(rd=D) %>% mutate(snp_index=as.character(1:n())) %>% inner_join(retdf,by = "snp_index")
-  }
   return(retdf)
 }
 
 
 estimate_RSSp_files <- function(evdf,simf,genof,chunksize,R_dataname="R",doConfound=T,doNoConfound=F,doLog=F,useGrad=T,result_dir=tempdir(),use_ldetect=F){
+  library(purrr)
+  library(dplyr)
+  library(RcppEigenH5)
+  library(tidyr)
+
   stopifnot((doConfound+doNoConfound)>0)
   library(LDshrink)
   if(!file.exists(evdf)){
@@ -113,19 +114,19 @@ estimate_RSSp_files <- function(evdf,simf,genof,chunksize,R_dataname="R",doConfo
     dir.create(result_dir,recursive=T)
   }
   result_f <- file.path(result_dir,base_simf)
-  if(file.exists(result_f)){
-    resultl <- readRDS(result_f)
-    res_md5 <- resultl[["md5"]]
-    if(res_md5==sim_md5){
-      t_res <- resultl[["result"]]
-    }
-  }else{
+  # if(file.exists(result_f)){
+  #   # resultl <- readRDS(result_f)
+  #   # res_md5 <- resultl[["md5"]]
+  #   # if(res_md5==sim_md5){
+  #   #   t_res <- resultl[["result"]]
+  #   # }
+  # }else{
     p <- asimd$p
     n <- asimd$n
-    prep_dfl <- gen_rss_est_df(Ql = datal[["Ql"]],
-                               rdl = datal[["rdl"]],
-                               indl=datal[["indl"]],
-                               uhmat=uhmat)
+    
+    prep_dfl <- prep_RSSp_evd(Ql=datal[["Ql"]],
+                              Dl=datal[["Dl"]],
+                              U=uhmat,N=n)
     df_l <- split(prep_dfl,prep_dfl$fgeneid) 
     cf_res <- NULL
     ncf_res <- NULL
@@ -141,12 +142,32 @@ estimate_RSSp_files <- function(evdf,simf,genof,chunksize,R_dataname="R",doConfo
     t_res <- mutate(asimd$tparam_df,fgeneid=as.character(fgeneid),chunksize=chunksize) %>% inner_join(f_res)
     resultl <- list(result=t_res,md5=sim_md5)
     saveRDS(resultl,result_f)
-  }
+  # }
   return(t_res)
 }
 
+est_sim <- function(resl,Q=NULL,D=NULL,doConfound=T,log_params=F,useGrad=T,a_bounds=c(0,.3),sigu_bounds=c(1e-4,1.5)){
+  library(purrr)
+  library(dplyr)
+  stopifnot(!is.null(D))  
+  if(is.null(Q)){
+    stopifnot(!is.null(resl$quh_mat))
+  }
+  if(is.null(resl$quh_mat)){
+    tres <- prep_RSSp_evd(Ql = list("1"=Q),Dl = list("1"=D),U = resl$bias_uh_mat,N = resl$n)
+    rss_res <- imap_dfr(split(tres$quh,tres$fgeneid),function(quh,fgeneid,D,p_n){
+      RSSp(fgeneid = fgeneid,D = D,quh = quh,p_n =p_n ,doConfound = doConfound,log_params = log_params,useGrad = useGrad,a_bounds = a_bounds,sigu_bounds=sigu_bounds)
+    },p_n=resl$p/resl$n,D=split(tres$D,tres$fgeneid)[[1]]) %>% inner_join(resl$tparam_df)
+  }else{
+    rss_res <-  imap_dfr(as_data_frame(resl$quh_mat),function(quh,fgeneid,D,p_n){
+      RSSp(fgeneid = fgeneid,D = D,quh = quh,p_n =p_n ,doConfound = doConfound,log_params = log_params,useGrad = useGrad,a_bounds = a_bounds,sigu_bounds = sigu_bounds)
+    },p_n=resl$p/resl$n,D=D) %>% inner_join(resl$tparam_df)
+  }
+  return(rss_res)
+}
+
     
-gen_sim_direct_evd <- function(Q,D,pve,bias=0,nreps,n,p,fgeneid=NULL){
+gen_sim_direct_evd <- function(Q,D,pve,bias=0,nreps,n,p,fgeneid=NULL,gen_quh=F){
   library(dplyr)
   library(purrr)
   library(tidyr)
@@ -154,53 +175,31 @@ gen_sim_direct_evd <- function(Q,D,pve,bias=0,nreps,n,p,fgeneid=NULL){
     group_by(tpve,tbias,tsigu) %>% 
     mutate(fgeneid=as.character(fgeneid)) %>% 
     nest(fgeneid)
-  asims <- tparam_df %>% rowwise() %>% do(simuh_dir(sigu = .$tsigu,bias = .$tbias,Q = Q,D=D,fgeneids = .$data))
+  asims <- tparam_df %>% rowwise() %>% do(simuh_dir(sigu = .$tsigu,bias = .$tbias,Q = Q,D=D,fgeneids = .$data,gen_quh=gen_quh))
+  if(gen_quh){
+    quh_mat <- select(asims,snp_index,fgeneid,quh) %>% spread(key = fgeneid,value = quh) %>% select(-snp_index) %>% data.matrix
+  }
   bias_uh_mat <- select(asims,snp_index,fgeneid,uh) %>% spread(key = fgeneid,value = uh) %>% select(-snp_index) %>% data.matrix
   tparam_df <- unnest(tparam_df)
   retl <- list(bias_uh_mat=bias_uh_mat,
                tparam_df=tparam_df, n=n, p=p)
+  if(gen_quh){
+    retl[["quh_mat"]] <- quh_mat
+  }
   return(retl)
 }
     
 
-gen_sim_direct <- function(R,pve,bias=0,nreps,outdir,n=948,collapse_all=T,overwrite=F,debug=F){
+gen_sim_direct <- function(R,pve,bias=0,nreps,n=NULL,gen_quh=F){
+  stopifnot(isSymmetric(R),!is.null(n))
   library(dplyr)
   library(purrr)
   library(tidyr)
-  if(!dir.exists(outdir)){
-    dir.create(outdir)
-  }
-  stopifnot(isSymmetric(R))
-  # function(sigu,bias,Q,D,fgeneids,seed=NULL){  p <- nrow(R)
   evdR <- eigen(R)
   Q <- evdR$vectors
   D <- evdR$values
-  Rsq <- R%*%R
-  tparam_df <- gen_tparamdf_norm(pve, bias, nreps=nreps, n, p) %>% select(-replicate) %>%
-    group_by(tpve,tbias,tsigu) %>% mutate(fgeneid=as.character(fgeneid)) %>% nest(fgeneid)
-  asims <- tparam_df %>% rowwise() %>% do(simuh_dir(sigu = .$tsigu,bias = .$tbias,Q = Q,D=D,fgeneids = .$data))
-  bias_uh_mat <- select(asims,snp_index,fgeneid,uh) %>% spread(key = fgeneid,value = uh) %>% select(-snp_index) %>% data.matrix
-  tparam_df <- unnest(tparam_df)
-
-  if(!collapse_all){
-    saveRDS(bias_uh_mat, file.path(outdir, "bias_uh_mat.RDS"))
-    saveRDS(tparam_df, file.path(outdir, "tparam_df.RDS"))
-  }else{
-    outfilep <- file.path(outdir, "simulation.RDS")
-    i <- 0
-    if(!overwrite){
-      while(file.exists(outfilep)){
-        i <- i+1
-        outfilep <- file.path(outdir, paste0("simulation", i, ".RDS"))
-      }
-    }
-    retl <- list(bias_uh_mat=bias_uh_mat,
-                 tparam_df=tparam_df, n=n, p=p)
-    retl[["md5"]] <- PKI::PKI.digest(as.raw(retl[["bias_uh_mat"]]))
-    saveRDS(retl, file = outfilep)
-    return(outfilep)
-  }
-
+  p <- nrow(R)
+  return(gen_sim_direct_evd(Q,D,pve,bias,nreps,n,p,gen_quh))
 }
 
 
@@ -270,6 +269,8 @@ gen_sim_gds <- function(gds,pve,bias=0,nreps=1,seed=NULL,chunksize=10000,fgeneid
   
   return(retl)
 }
+
+
 
 read_SNPinfo_ldsc_gwas <- function(gds,zmat,N=NULL){
   library(tidyr)
@@ -345,7 +346,7 @@ gen_sim_list <- function(SNP, pve, bias=0, nreps,seed=NULL){
   p <- ncol(SNP)
 
   stopifnot(all.equal(colMeans(SNP),rep(0,p),tolerance=1e-5))
-  tparam_df <- gen_tparamdf_norm(pve, bias, nreps, n, p)
+  tparam_df <- gen_tparamdf_norm(pve, bias, nreps, n, p) %>% mutate(fgeneid=as.character(fgeneid))
   
   u_mat <- sapply(tparam_df$tsigu, function(sigu, p){rnorm(n = p, mean = 0, sd = sigu)}, p=p)
   

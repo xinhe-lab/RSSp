@@ -21,6 +21,10 @@ evd_dnorm_grad <- function(par, dvec, quh) {
     .Call('_RSSp_evd_dnorm_grad', PACKAGE = 'RSSp', par, dvec, quh)
 }
 
+evd_dnorm_step <- function(par, dvec, quh, step_size) {
+    .Call('_RSSp_evd_dnorm_step', PACKAGE = 'RSSp', par, dvec, quh, step_size)
+}
+
 #' evd_dnorm_grad_stan
 #' 
 #' This is an attempt to use stan's AD features to calculate a gradient 
@@ -31,6 +35,10 @@ evd_dnorm_grad <- function(par, dvec, quh) {
 #' @param quh The precomputed matrix vector product Q%*%u_hat (passed as a vector)
 evd_dnorm_grad_stan <- function(par, dvec, quh) {
     .Call('_RSSp_evd_dnorm_grad_stan', PACKAGE = 'RSSp', par, dvec, quh)
+}
+
+simuh_dir_cpp <- function(sigu, bias, nreps, Q, D, fgeneids, usim) {
+    .Call('_RSSp_simuh_dir_cpp', PACKAGE = 'RSSp', sigu, bias, nreps, Q, D, fgeneids, usim)
 }
 
 rcppeigen_hello_world <- function() {

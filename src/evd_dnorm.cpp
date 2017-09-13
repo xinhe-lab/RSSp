@@ -23,7 +23,7 @@ double evd_dnorm(const Eigen::Map<Eigen::ArrayXd> par,const Eigen::Map<Eigen::Ar
   const double varu=sigu*sigu;
   const double a=(par.size()>1)?par(1):0;
   double tsum = ((dvec*dvec*varu+dvec+a).log()).sum();
-  double tprod = ((quh*(1/(dvec*dvec*varu+dvec+a)))*(quh)).sum();
+  double tprod = (quh*(1/(dvec*dvec*varu+dvec+a))*quh).sum();
   return -0.5*(tsum+tprod);
 }
 
@@ -44,11 +44,17 @@ Eigen::ArrayXd evd_dnorm_grad(const Eigen::Map<Eigen::ArrayXd> par,const Eigen::
   
   double sgrad = -((dvec.square()*sigu*(a+dvec.square()*varu+dvec-quh.square()))/(a+dvec.square()*varu+dvec).square()).sum();
   double  agrad = -((0.5*(a+dvec.square()*varu+dvec-quh.square()))/(a+dvec.square()*varu+dvec).square()).sum();
-
+  
   Eigen::ArrayXd retvec(2);
   retvec(0)=sgrad;
   retvec(1)=agrad;
   return(retvec);
+}
+
+
+//[[Rcpp::export]]
+Eigen::ArrayXd evd_dnorm_step(const Eigen::Map<Eigen::ArrayXd> par,const Eigen::Map<Eigen::ArrayXd> dvec, const Eigen::Map<Eigen::ArrayXd> quh,const double step_size){
+  return(par-step_size*evd_dnorm_grad(par,dvec,quh));
 }
 
 
@@ -84,6 +90,8 @@ struct evd_dens {
   }
   
 };
+
+
 
 
 
