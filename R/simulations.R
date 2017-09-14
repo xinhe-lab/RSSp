@@ -83,7 +83,7 @@ simuh_dir <-  function(sigu,bias,Q,D,fgeneids,seed=NULL,gen_quh=F){
 }
 
 
-estimate_RSSp_files <- function(evdf,simf,genof,chunksize,R_dataname="R",doConfound=T,doNoConfound=F,doLog=F,useGrad=T,result_dir=tempdir(),use_ldetect=F){
+estimate_RSSp_files <- function(evdf,simf,genof,chunksize,R_dataname="R",doConfound=T,doNoConfound=F,doLog=F,useGradient=T,result_dir=tempdir(),use_ldetect=F){
   library(purrr)
   library(dplyr)
   library(RcppEigenH5)
@@ -132,10 +132,10 @@ estimate_RSSp_files <- function(evdf,simf,genof,chunksize,R_dataname="R",doConfo
     ncf_res <- NULL
     
     if(doConfound){
-      cf_res <- bind_rows(lapply(df_l,RSSp_estimate,p_n=p/n,doConfound=T,log_params=doLog,useGrad=useGrad))
+      cf_res <- bind_rows(lapply(df_l,RSSp_estimate,p_n=p/n,doConfound=T,log_params=doLog,useGradient=useGradient))
     }
     if(doNoConfound){
-      ncf_res <- bind_rows(lapply(df_l,RSSp_estimate,p_n=p/n,doConfound=F,log_params=doLog,useGrad=useGrad))
+      ncf_res <- bind_rows(lapply(df_l,RSSp_estimate,p_n=p/n,doConfound=F,log_params=doLog,useGradient=useGradient))
     }
     f_res <- bind_rows(cf_res,ncf_res)
     stopifnot(!is.null(f_res))
@@ -145,24 +145,28 @@ estimate_RSSp_files <- function(evdf,simf,genof,chunksize,R_dataname="R",doConfo
   # }
   return(t_res)
 }
+# 
+# est_sim_evdf <- function(evdf,resl){
+#   library(LDshrink)
+#   library(RcppEigen)
+#   resl$quh_mat <- sparse_matmul()
+#   
+# }
 
-est_sim <- function(resl,Q=NULL,D=NULL,doConfound=T,log_params=F,useGrad=T,a_bounds=c(0,.3),sigu_bounds=c(1e-4,1.5)){
+
+
+est_sim <- function(resl,Ql=NULL,D=NULL,doConfound=T,log_params=F,useGradient=T,a_bounds=c(0,.3),sigu_bounds=c(1e-4,1.5)){
   library(purrr)
   library(dplyr)
   stopifnot(!is.null(D))  
-  if(is.null(Q)){
+  if(is.null(Ql)){
     stopifnot(!is.null(resl$quh_mat))
   }
   if(is.null(resl$quh_mat)){
-    tres <- prep_RSSp_evd(Ql = list("1"=Q),Dl = list("1"=D),U = resl$bias_uh_mat,N = resl$n)
-    rss_res <- imap_dfr(split(tres$quh,tres$fgeneid),function(quh,fgeneid,D,p_n){
-      RSSp(fgeneid = fgeneid,D = D,quh = quh,p_n =p_n ,doConfound = doConfound,log_params = log_params,useGrad = useGrad,a_bounds = a_bounds,sigu_bounds=sigu_bounds)
-    },p_n=resl$p/resl$n,D=split(tres$D,tres$fgeneid)[[1]]) %>% inner_join(resl$tparam_df)
-  }else{
-    rss_res <-  imap_dfr(as_data_frame(resl$quh_mat),function(quh,fgeneid,D,p_n){
-      RSSp(fgeneid = fgeneid,D = D,quh = quh,p_n =p_n ,doConfound = doConfound,log_params = log_params,useGrad = useGrad,a_bounds = a_bounds,sigu_bounds = sigu_bounds)
-    },p_n=resl$p/resl$n,D=D) %>% inner_join(resl$tparam_df)
+    resl$quh_mat <- quh_mat(Ql,resl$bias_uh_mat)
   }
+  rss_res <- cross(list(doConfound=doConfound,log_params=log_params,useGradient=useGradient)) %>% 
+    invoke_map_dfr("RSSp_run_mat_quh",.,quh_mat_d=resl$quh_mat,D=D,n=resl$n) %>% inner_join(resl$tparam_df)
   return(rss_res)
 }
 
@@ -203,7 +207,7 @@ gen_sim_direct <- function(R,pve,bias=0,nreps,n=NULL,gen_quh=F){
 }
 
 
-gen_sim_gds <- function(gds,pve,bias=0,nreps=1,seed=NULL,chunksize=10000,fgeneid=NULL){
+gen_sim_gds <- function(gds,pve,bias=0,nreps=1,seed=NULL,chunksize=10000,fgeneid=NULL,evdf=NULL,cores=1){
   library(SeqArray)
   library(LDshrink)
   library(dplyr)
@@ -234,7 +238,7 @@ gen_sim_gds <- function(gds,pve,bias=0,nreps=1,seed=NULL,chunksize=10000,fgeneid
                        margin="by.variant",
                        as.is = "list",
                        .progress = T,var.index="relative",
-                       sigu=tparam_df$tsigu,bsize = chunksize))
+                       sigu=tparam_df$tsigu,bsize = chunksize,parallel=cores))
 
   ty <- Reduce("+",S_U$ty)
   vy <- apply(ty, 2, var)
@@ -250,7 +254,7 @@ gen_sim_gds <- function(gds,pve,bias=0,nreps=1,seed=NULL,chunksize=10000,fgeneid
                        },ymat=ymat,
                        margin="by.variant",
                        as.is = "list",
-                       .progress = T,bsize = chunksize))
+                       .progress = T,bsize = chunksize,parallel=cores))
   betahat_mat <- do.call("rbind",beta_se$betahat)
   se_mat <- do.call("rbind",beta_se$se_mat)
   colnames(betahat_mat) <- as.character(tparam_df$fgeneid)
@@ -266,7 +270,11 @@ gen_sim_gds <- function(gds,pve,bias=0,nreps=1,seed=NULL,chunksize=10000,fgeneid
   colnames(bias_uh_mat) <- as.character(tparam_df$fgeneid)
   retl <- list(bias_uh_mat=bias_uh_mat,
                tparam_df=tparam_df, n=n, p=p)
-  
+  if(!is.null(evdf)){
+    ql_df <- LDshrink::read_si_ql(evdf)
+    # quhm <- gen_quh(ql_df$Ql,uhmat <- bias_
+    retl[["quh_mat"]] <- quh_mat(ql_df$Ql,uhmat = bias_uh_mat)
+  }
   return(retl)
 }
 
@@ -295,7 +303,7 @@ read_SNPinfo_ldsc_gwas <- function(gds,zmat,N=NULL){
 
 
 
-gen_sim_gds_direct_ldsc <- function(Ql,Dl,gds,pve,bias=0,nreps=1,seed=NULL,fgeneid=NULL){
+gen_sim_gds_direct_ldsc <- function(Ql,Dl,gds,pve,bias=0,nreps=1,seed=NULL,fgeneid=NULL,gen_quh=F){
   library(LDshrink)
   library(readr)
   library(purrr)
@@ -324,7 +332,7 @@ gen_sim_gds_direct_ldsc <- function(Ql,Dl,gds,pve,bias=0,nreps=1,seed=NULL,fgene
 }
   
   
-gen_sim_gds_ldsc <- function(gds,pve,bias=0,nreps=1,seed=NULL,chunksize=10000,fgeneid=NULL){
+gen_sim_gds_ldsc <- function(gds,pve,bias=0,nreps=1,seed=NULL,chunksize=10000,fgeneid=NULL,evdf=NULL){
   library(LDshrink)
   library(readr)
   

@@ -41,6 +41,10 @@ simuh_dir_cpp <- function(sigu, bias, nreps, Q, D, fgeneids, usim) {
     .Call('_RSSp_simuh_dir_cpp', PACKAGE = 'RSSp', sigu, bias, nreps, Q, D, fgeneids, usim)
 }
 
+block_mat_mul <- function(mat_l, ymat, transpose_mat_l = FALSE) {
+    .Call('_RSSp_block_mat_mul', PACKAGE = 'RSSp', mat_l, ymat, transpose_mat_l)
+}
+
 rcppeigen_hello_world <- function() {
     .Call('_RSSp_rcppeigen_hello_world', PACKAGE = 'RSSp')
 }

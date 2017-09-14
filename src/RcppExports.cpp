@@ -76,6 +76,19 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// block_mat_mul
+Rcpp::NumericMatrix block_mat_mul(Rcpp::ListOf<Rcpp::NumericMatrix>& mat_l, Rcpp::NumericMatrix& ymat, bool transpose_mat_l);
+RcppExport SEXP _RSSp_block_mat_mul(SEXP mat_lSEXP, SEXP ymatSEXP, SEXP transpose_mat_lSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::ListOf<Rcpp::NumericMatrix>& >::type mat_l(mat_lSEXP);
+    Rcpp::traits::input_parameter< Rcpp::NumericMatrix& >::type ymat(ymatSEXP);
+    Rcpp::traits::input_parameter< bool >::type transpose_mat_l(transpose_mat_lSEXP);
+    rcpp_result_gen = Rcpp::wrap(block_mat_mul(mat_l, ymat, transpose_mat_l));
+    return rcpp_result_gen;
+END_RCPP
+}
 // rcppeigen_hello_world
 Eigen::MatrixXd rcppeigen_hello_world();
 RcppExport SEXP _RSSp_rcppeigen_hello_world() {
@@ -126,6 +139,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_RSSp_evd_dnorm_step", (DL_FUNC) &_RSSp_evd_dnorm_step, 4},
     {"_RSSp_evd_dnorm_grad_stan", (DL_FUNC) &_RSSp_evd_dnorm_grad_stan, 3},
     {"_RSSp_simuh_dir_cpp", (DL_FUNC) &_RSSp_simuh_dir_cpp, 7},
+    {"_RSSp_block_mat_mul", (DL_FUNC) &_RSSp_block_mat_mul, 3},
     {"_RSSp_rcppeigen_hello_world", (DL_FUNC) &_RSSp_rcppeigen_hello_world, 0},
     {"_RSSp_rcppeigen_outerproduct", (DL_FUNC) &_RSSp_rcppeigen_outerproduct, 1},
     {"_RSSp_rcppeigen_innerproduct", (DL_FUNC) &_RSSp_rcppeigen_innerproduct, 1},

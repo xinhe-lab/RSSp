@@ -54,6 +54,8 @@ prep_RSSp_evd <- function(Ql,Dl,U,N){
 
 
 
+
+
 #' RSSp
 #'
 #' Run RSSp on one or several traits
@@ -63,40 +65,36 @@ prep_RSSp_evd <- function(Ql,Dl,U,N){
 #' @param quh a `p` by `ntrait` matrix with transformed, standardized effect sizes obtained from running `prep_RSSp`
 #'  (If only one trait is being analyzed, `quh` can also be a length `p` vector)
 #'  @param sigu_bounds
-RSSp <- function(fgeneid=NULL,D,quh,sigu_bounds=c(1e-7,2.6),a_bounds=c(0,1),p_n,doConfound=T,log_params=F,itermax=100,useGrad=T){
+RSSp <- function(fgeneid=NULL,D,quh,sigu_bounds=c(1e-7,2.6),a_bounds=c(0,1),p_n,doConfound=T,log_params=F,useGradient=T){
   RSSp_estimate(data_frame(fgeneid=fgeneid,D=D,quh=quh),
                 sigu_bounds=sigu_bounds,a_bounds=a_bounds,
                 p_n=p_n,doConfound = doConfound,
                 log_params=log_params,
-                itermax=itermax,useGrad=useGrad)
+                useGradient=useGradient)
 
 }
 
-RSSp_run_mat <- function(Ql_df,uh_mat,n){
+RSSp_run_mat_quh <- function(quh_mat_d,D,n,sigu_bounds=c(1e-07,2.6),a_bounds=c(0,1),doConfound=T,log_params=F,useGradient=T){
   library(dplyr)
   library(tidyr)
   library(SeqArray)
   library(LDshrink)
   library(purrr)
-  fgeneids <- colnames(uh_mat)
-  Ql <- Ql_df$Ql
-  p <- sum(sapply(Ql,nrow))
-
-  Dl <- Ql_df$Dl
-  stopifnot(sum(lengths(Dl))==p)
+  fgeneids <- colnames(quh_mat_d)
+  stopifnot(nrow(quh_mat_d)==length(D))
+  p <- length(D)
   p_n <- p/n
-  Ql_df <- unnest(Ql_df$LDinfo) %>% mutate(snp_id=1:n())
-  indl <- split(Ql_df$snp_id,Ql_df$region_id)
-  quh <- gen_quh(Ql = Ql, uhmat = uh_mat ,indl = indl, Dl = Dl) %>% unnest()
-  quhl <- split(quh$quh,quh$fgeneid)
-  Dl <- split(quh$D,quh$fgeneid)
-  fgeneid=names(quhl)
-  return(pmap(.l = list(fgeneid=names(quhl),
-                        D=Dl,
-                        quh=quhl),RSSp,p_n=p_n))
 
+  quhl <- array_branch(quh_mat_d,2)
+  names(quhl) <- fgeneids
+  return(imap_dfr(quhl,function(quh,fgeneid,D,p_n){
+    RSSp(fgeneid = fgeneid,D = D,quh = quh,p_n = p_n,doConfound=doConfound,log_params=log_params,useGradient=useGradient)
+    },
+    D=D,p_n=p/n))
+}
 
-
+RSSp_run_mat <- function(Ql_df,uh_mat,n,sigu_bounds=c(1e-07,2.6),a_bounds=c(0,1),doConfound=T,log_params=F,useGradient=T){
+  return(RSSp_run_mat_quh(quh_mat(Ql = Ql_df$Ql,uhmat = uh_mat),D,n,sigu_bounds,a_bounds,doConfound,log_params,useGradient))
 }
 
 
@@ -152,19 +150,19 @@ RSSp_run <- function(Ql_df,sumstat_df,fgeneid=NULL,n=NULL){
 # }
 
 
-RSSp_estimate <- function(data_df,sigu_bounds= c(1e-7,2.6),a_bounds=c(0,1),p_n,doConfound=T,log_params=F,itermax=100,useGrad=T){
+RSSp_estimate <- function(data_df,sigu_bounds= c(1e-7,2.6),a_bounds=c(0,1),p_n,doConfound=T,log_params=F,useGradient=T){
   library(purrr)
   stopifnot(length(unique(data_df$fgeneid))==1)
   if(log_params){
     sigu_bounds <- log(sigu_bounds)
     a_bounds <- log(a_bounds+.Machine$double.eps)
-    if(useGrad){
+    if(useGradient){
       grf <- RSSp_evd_lmvd_grad
     }else{
       grf <- NULL
     }
   }else{
-    if(useGrad){
+    if(useGradient){
       grf <- RSSp_evd_mvd_grad
     }else{
       grf <- NULL
@@ -177,7 +175,7 @@ RSSp_estimate <- function(data_df,sigu_bounds= c(1e-7,2.6),a_bounds=c(0,1),p_n,d
   maxb <- c(sigu_bounds[2],
             a_bounds[2])
   
-  ctrl <- list(lmm=itermax)
+  ctrl <- list(lmm=7)
   par0 <- runif(2,min=minb,max = maxb)
   # dvecl <- lapply(data_df,"[[","rd")
   dvec <- data_df$D
@@ -226,7 +224,6 @@ RSSp_estimate <- function(data_df,sigu_bounds= c(1e-7,2.6),a_bounds=c(0,1),p_n,d
       if(is.null(convm)){
         convm <- "Converged"
       }
-
     }
   }
 
@@ -234,13 +231,17 @@ RSSp_estimate <- function(data_df,sigu_bounds= c(1e-7,2.6),a_bounds=c(0,1),p_n,d
                     convergence=conv,
                     message=convm,
                     fgeneid=as.character(unique(data_df[["fgeneid"]])),
-                    method=ifelse(doConfound,"Confound","NoConfound"),pve=p_n*sigu^2))
+                    log_params=log_params,
+                    useGradient=useGradient,
+                    method=ifelse(doConfound,"Confound","NoConfound"),
+                    pve=p_n*sigu^2))
 }
 
 
 
 
 chunk_mat_rows <- function(mat,factor,index){
+  # uh_l <- lapply(indl,function(x,mat)return(mat[x,,drop=F]),mat=uhmat)
   stopifnot(length(factor)==length(index))
   # stopifnot(max(factor)<=nrow(mat))
   indexl <- split(index,factor)
@@ -250,8 +251,18 @@ chunk_mat_rows <- function(mat,factor,index){
 }
 
 
-quh_mat <- function(Ql,uhmat,indl){
-  
+
+
+quh_mat <- function(Ql,uhmat){
+  ret_quh_mat <- block_mat_mul(Ql,uhmat,transpose_mat_l = T)
+  colnames(ret_quh_mat) <- colnames(uhmat)
+  # uh_l <- lapply(indl,function(x,mat)return(mat[x,,drop=F]),mat=uhmat)
+  # ind_df <- data_frame(snp_index=indl) %>% mutate(region_id=names(indl)) %>% unnest()
+  # uh_l <- chunk_mat_rows(uhmat,ind_df$region_id,ind_df$snp_index)
+  # buhl<- data_frame(region_id=names(Ql),quh=pmap(list(xm=Ql,ym=uh_l,im=indl,rd=Dl),function(xm,ym,im,rd){
+  #   as_data_frame(crossprod(xm,ym)) %>% mutate(snp_index=im,D=rd) %>% gather(fgeneid,quh,-snp_index,-D)
+  # }))
+  return(ret_quh_mat)
 }
 
 gen_quh <- function(Ql,uhmat,indl,Dl){
