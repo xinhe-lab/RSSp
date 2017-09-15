@@ -207,7 +207,24 @@ gen_sim_direct <- function(R,pve,bias=0,nreps,n=NULL,gen_quh=F){
 }
 
 
-gen_sim_gds <- function(gds,pve,bias=0,nreps=1,seed=NULL,chunksize=10000,fgeneid=NULL,evdf=NULL,cores=1){
+sim_S <- function(index,x,sigu){
+  #I'm adding a sneaky bit in here to deal with the (extremely) rare 
+  #event where all individuals are hets at a particular locus
+  #what I'm doing is simply assigning the variant a beta of 0
+  n <- nrow(x)
+  p <- ncol(x)
+  sx <- scale(x,center=T,scale=F)
+  u_mat <- sapply(sigu,function(tsigu,p){rnorm(n=p,mean=0,sd=tsigu)},p=p)
+  S <- 1/sqrt(n)*1/apply(sx,2,sd)
+  beta <- u_mat*S
+  beta[!is.finite(beta)]<-0
+  ty <- sx%*%beta
+  return(ty)
+}
+
+
+
+gen_ty_block_gds <- function(gds,tparam_df,seed=NULL,chunksize=10000,cores=1){
   library(SeqArray)
   library(LDshrink)
   library(dplyr)
@@ -218,56 +235,87 @@ gen_sim_gds <- function(gds,pve,bias=0,nreps=1,seed=NULL,chunksize=10000,fgeneid
   # gds <- seqOpen(gds_file,readonly = T)
   isHaplo <- LDshrink::is_haplo(gds)
   stopifnot(!isHaplo)
-  n <- length(seqGetData(gds,"sample.id")) 
-  p <- length(seqGetData(gds,"variant.id"))
-  
-  
-  tparam_df <- gen_tparamdf_norm(pve, bias, nreps, n, p,fgeneid=fgeneid)
 
-  sim_S <- function(index,x,sigu){
-    n <- nrow(x)
-    p <- ncol(x)
-    u_mat <- sapply(sigu,function(tsigu,p){rnorm(n=p,mean=0,sd=tsigu)},p=p)
-    S <- 1/sqrt(n)*1/apply(scale(x,center = T,scale = F),2,sd)
-    beta <- u_mat*S
-    return(list(u=u_mat,beta=beta,ty=scale(x,center=T,scale=F)%*%beta))
+  S_U <- seqBlockApply(gds,c(x="$dosage"),
+                                 sim_S,
+                                 margin="by.variant",
+                                 as.is = "list",
+                                 .progress = T,var.index="relative",
+                                 sigu=tparam_df$tsigu,bsize = chunksize,parallel=cores)
+  
+  
+  ty <- Reduce("+",S_U)
+  return(ty)
+}
+
+
+
+gen_bhat_se_block_gds <- function(gds,ymat,cores,tparam_df,chunksize=10000,na.rm=F){
+  library(SeqArray)
+  library(RSSReQTL)
+
+  uh_matl <- seqBlockApply(gds,c(x="$dosage"),
+                                     function(x,ymat){
+                                       sx <- scale(x,center=T,scale=F)
+                                       betahat <- RSSReQTL::map_beta_exp(sx, ymat)
+                                       se_mat <- RSSReQTL::map_se_exp(sx, ymat, betahat)
+                                       return(betahat/se_mat)
+                                     },ymat=ymat,
+                                     margin="by.variant",
+                                     as.is = "list",
+                                     .progress = T,bsize = chunksize,parallel=cores)
+  uh_mat <- do.call("rbind",uh_matl)
+  p <- nrow(uh_mat)
+  colnames(uh_mat) <- as.character(tparam_df$fgeneid)
+  bias_mat <- sapply(tparam_df$tbias, function(ta, p){rnorm(n=p, mean=0, sd=sqrt(ta))}, p=p)
+  colnames(bias_mat) <- as.character(tparam_df$fgeneid)
+  bias_uh_mat <- uh_mat+bias_mat
+  colnames(bias_uh_mat) <- as.character(tparam_df$fgeneid)
+  if(na.rm){
+    bias_uh_mat[!is.finite(bias_uh_mat)] <- 0
+  }
+  return(bias_uh_mat)
+}
+
+
+
+gen_sim_phenotype_gds <- function(gds,tparam_df,seed=NULL,chunksize=10000,fgeneid=NULL,cores=1){
+  
+  library(SeqArray)
+  library(LDshrink)
+  library(dplyr)
+  library(purrr)
+  if(!is.null(seed)){
+    set.seed(seed)
   }
   
-  S_U <- transpose(seqBlockApply(gds,c(x="$dosage"),
-                       sim_S,
-                       margin="by.variant",
-                       as.is = "list",
-                       .progress = T,var.index="relative",
-                       sigu=tparam_df$tsigu,bsize = chunksize,parallel=cores))
 
-  ty <- Reduce("+",S_U$ty)
+  
+  ty <- gen_ty_block_gds(gds = gds,
+                         tparam_df = tparam_df,
+                         seed = seed,
+                         chunksize = chunksize,cores=cores)
+  
+  
   vy <- apply(ty, 2, var)
+  n <- nrow(ty)
   residvec <- gen_ti(vy, tparam_df$tpve)
   residmat <- sapply(residvec, function(ti, n){rnorm(n=n, mean=0, sd=sqrt(ti))}, n=n)
   ymat <- scale(ty+residmat, center=T, scale=F)
-  beta_se <- transpose(seqBlockApply(gds,c(x="$dosage"),
-                       function(x,ymat){
-                         sx <- scale(x,center=T,scale=F)
-                         betahat <- RSSReQTL::map_beta_exp(sx, ymat)
-                         se_mat <- RSSReQTL::map_se_exp(sx, ymat, betahat)
-                         return(list(betahat=betahat,se_mat=se_mat))
-                       },ymat=ymat,
-                       margin="by.variant",
-                       as.is = "list",
-                       .progress = T,bsize = chunksize,parallel=cores))
-  betahat_mat <- do.call("rbind",beta_se$betahat)
-  se_mat <- do.call("rbind",beta_se$se_mat)
-  colnames(betahat_mat) <- as.character(tparam_df$fgeneid)
-
-  colnames(se_mat) <- as.character(tparam_df$fgeneid)
+  return(ymat)
   
-  bias_mat <- sapply(tparam_df$tbias, function(ta, p){rnorm(n=p, mean=0, sd=sqrt(ta))}, p=p)
-  colnames(bias_mat) <- as.character(tparam_df$fgeneid)
-  uh_mat <- betahat_mat/se_mat
-  colnames(uh_mat) <- as.character(tparam_df$fgeneid)
-  #  u_mat <- betamat/se_mat
-  bias_uh_mat <- uh_mat+bias_mat
-  colnames(bias_uh_mat) <- as.character(tparam_df$fgeneid)
+}
+
+
+
+gen_sim_gds <- function(gds,pve,bias=0,nreps=1,seed=NULL,chunksize=10000,fgeneid=NULL,evdf=NULL,cores=1){
+
+  tparam_df <- gen_tparamdf_norm(pve, bias, nreps, n, p,fgeneid=fgeneid)
+  
+  
+  ymat <- gen_sim_phenotype_gds(gds,tparam_df,seed,chunksize,fgeneid,cores)
+  bias_uh_mat <- gen_bhat_se_block_gds(gds,ymat,cores,tparam_df)
+  
   retl <- list(bias_uh_mat=bias_uh_mat,
                tparam_df=tparam_df, n=n, p=p)
   if(!is.null(evdf)){
