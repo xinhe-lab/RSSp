@@ -64,7 +64,7 @@ test_that("We can estimate parameters",{
   names(Rl[["Ql"]]) <- 1:length(Rl$Ql)
   names(Rl$rdl) <- 1:length(Rl$rdl)
   names(Rl$indl) <- 1:length(Rl$indl)
-  quh <- gen_quh(Rl$Ql,uhmat = asimd$bias_uh_mat,indl = Rl$indl,rdl = Rl$rdl) %>% unnest()
+  quh <- gen_quh(Rl$Ql,uhmat = asimd$bias_uh_mat,indl = Rl$indl,Dl = Rl$rdl) %>% unnest()
 
   qhl <-  split(quh$quh,quh$fgeneid)
   rdl <- split(quh$rd,quh$fgeneid)
@@ -77,7 +77,7 @@ test_that("We can estimate parameters",{
 })
 
 
-
+# 
 test_that("Both methods of simulating MVN work",{
   data("shrink_R")
   data("cohort_SNP")
@@ -86,7 +86,7 @@ test_that("Both methods of simulating MVN work",{
   bias <- as.numeric(seq(0.0,0.1,length.out = 2))
   nreps <- 4
   n <- nrow(cohort_SNP)
-  
+
   test_simuh_dir <- function(sigu,bias,R,Rsq,fgeneids,seed=NULL){
     p <- nrow(R)
     if(!is.null(seed)){
@@ -101,61 +101,188 @@ test_that("Both methods of simulating MVN work",{
     retdf <- as_data_frame(uhmat) %>% mutate(snp_index=1:n()) %>% gather(fgeneid,uh,-snp_index) %>% mutate(tsigu=sigu,tbias=bias)
     return(retdf)
   }
-  
-  
-  
+
+
+
   p <- ncol(cohort_SNP)
-  tparam_df <- gen_tparamdf_norm(pve, bias, nreps=nreps, n, p) %>% select(-replicate) %>% 
+  tparam_df <- gen_tparamdf_norm(pve, bias, nreps=nreps, n, p) %>%
     group_by(tpve,tbias,tsigu) %>% mutate(fgeneid=as.character(fgeneid)) %>% nest(fgeneid) %>% slice(1)
-  
+
   eigenR <- eigen(shrink_R)
   Rsq <- shrink_R%*%shrink_R
-  asims <- tparam_df %>% rowwise() %>% do(test_simuh_dir(sigu = .$tsigu,bias = .$tbias,R = shrink_R,Rsq=Rsq,fgeneids = .$data,seed=123L)) %>% 
+  asims <- tparam_df %>% rowwise() %>% do(test_simuh_dir(sigu = .$tsigu,bias = .$tbias,R = shrink_R,Rsq=Rsq,fgeneids = .$data,seed=123L)) %>%
     ungroup() %>% mutate(sim="Old")
-  aasims <- tparam_df %>% rowwise() %>% do(test_simuh_dir(sigu = .$tsigu,bias = .$tbias,R = shrink_R,Rsq=Rsq,fgeneids = .$data,seed=123L)) %>% 
+  aasims <- tparam_df %>% rowwise() %>% do(test_simuh_dir(sigu = .$tsigu,bias = .$tbias,R = shrink_R,Rsq=Rsq,fgeneids = .$data,seed=123L)) %>%
     ungroup() %>% mutate(sim="Old")
   expect_identical(asims,aasims)
 
   Q <- eigenR$vectors
   D <- eigenR$values
-  bsims <- tparam_df %>% rowwise() %>% do(simuh_dir(sigu = .$tsigu,bias = .$tbias,Q = Q,D=D,fgeneids = .$data,seed=123L)) %>% 
+  bsims <- tparam_df %>% rowwise() %>% do(simuh_dir(sigu = .$tsigu,bias = .$tbias,Q = Q,D=D,fgeneids = .$data,seed=123L)) %>%
     ungroup() %>% mutate(sim="New")
-  bbsims <- tparam_df %>% rowwise() %>% do(simuh_dir(sigu = .$tsigu,bias = .$tbias,Q = Q,D=D,fgeneids = .$data,seed=123L)) %>% 
+  bbsims <- tparam_df %>% rowwise() %>% do(simuh_dir(sigu = .$tsigu,bias = .$tbias,Q = Q,D=D,fgeneids = .$data,seed=123L)) %>%
     ungroup() %>% mutate(sim="New")
   expect_identical(bsims,bbsims)
   expect_equal(asims$uh,bsims$uh)
-  
   })
 
 
 
-test_that("We can estimate parameters with direct simulations",{
+test_that("Multivariate density is straightforward to compute when the covariance is diagonal and there's no bias",{
+  
   data("shrink_R")
-  data("cohort_SNP")
+  p <- nrow(shrink_R)
+  R <- diag(p)
+  Revd <- eigen(R)
   
-  pve <- as.numeric(seq(0.01,0.2,length.out = 8))
-  bias <- as.numeric(seq(0.0,0.1,length.out = 2))
-  nreps <- 4
-  n <- nrow(cohort_SNP)
-  p <- ncol(cohort_SNP)
-  temp_dir <- tempdir()
-  sim_file <- gen_sim_direct(shrink_R,pve,bias,nreps,temp_dir,n = n)
-  # sim_file <- gen_sim(SNP,pve,bias,nreps,temp_dir)
-  chunksize <- p
-  asimd <- readRDS(sim_file)
-  Rl <- LDshrink::write_eigen_chunks(chunksize=chunksize,R = shrink_R,write=F)
-  m_est_df <- gen_rss_est_df(Rl$Ql,Rl$rdl,Rl$indl,asimd$bias_uh_mat)
-  splitl <- split(m_est_df,m_est_df$fgeneid)
-  m_res <- bind_rows(lapply(splitl,RSSp_estimate,p_n=p/n))
-  t_res <- inner_join(asimd$tparam_df,m_res)
-  
-  ggplot(t_res,aes(x=tpve,y=pve))+geom_point()
-  expect_equal(t_res$tpve,t_res$pve,tolerance=0.3)
-  expect_equal(t_res$tbias,t_res$a_hat,tolerance=0.3)
-  
+  sigu <- 0.5
+  bias <- 0.0
+  Rsq <- R%*%R
+  tcov <- sigu^2*Rsq+R+bias*diag(p)
+  rdat <- c(mvtnorm::rmvnorm(n=1,mean=rep(0,p),sigma=tcov))
+  qrdat <- c(crossprod(Revd$vectors,rdat))
+  mrnorm <- sum(dnorm(rdat,mean=0,sd=sqrt(diag(tcov)),log=T))
+  R_dens <- mvtnorm::dmvnorm(x = rdat,mean = rep(0,p),sigma = tcov,log = T)
+  expect_equal(mrnorm,R_dens)
+  cpp_dens <- evd_dnorm(c(sigu,bias),dvec=Revd$values,quh = qrdat)-0.5*p*log(2*pi)
+  expect_equal(cpp_dens,R_dens)
+  expect_equal(optimise(RSSp_evd_mvd,interval = c(0,1),dvec=Revd$values,quh=qrdat)$minimum,sigu,tolerance=0.2)
 })
 
 
+test_that("Multivariate density is computed correctly without bias",{
+  
+  data("shrink_R")
+  R <- shrink_R
+  Revd <- eigen(R)
+  p <- nrow(R)
+  sigu <- 0.5
+  bias <- 0.0
+  Rsq <- R%*%R
+  tcov <- sigu^2*Rsq+R+bias*diag(p)
+  rdat <- c(mvtnorm::rmvnorm(n=1,mean=rep(0,p),sigma=tcov))
+  qrdat <- c(crossprod(Revd$vectors,rdat))
+  R_dens <- mvtnorm::dmvnorm(x = rdat,mean = rep(0,p),sigma = tcov,log = T)
+  cpp_dens <- evd_dnorm(c(sigu,bias),dvec=Revd$values,quh = qrdat)-0.5*p*log(2*pi)
+  expect_equal(cpp_dens,R_dens)
+})
+
+
+test_that("Multivariate density is computed correctly with bias",{
+  
+  data("shrink_R")
+  R <- shrink_R
+  Revd <- eigen(R)
+  p <- nrow(R)
+  sigu <- 0.5
+  bias <- 0.1
+  Rsq <- R%*%R
+  tcov <- sigu^2*Rsq+R+bias*diag(p)
+  rdat <- c(mvtnorm::rmvnorm(n=1,mean=rep(0,p),sigma=tcov))
+  qrdat <- c(crossprod(Revd$vectors,rdat))
+  R_dens <- mvtnorm::dmvnorm(x = rdat,mean = rep(0,p),sigma = tcov,log = T)
+  cpp_dens <- evd_dnorm(c(sigu,bias),dvec=Revd$values,quh = qrdat)-0.5*p*log(2*pi)
+  expect_equal(cpp_dens,R_dens)
+})
+
+
+
+test_that("We can estimate parameters with direct simulations really well when using the identity as an LD matrix( and not estimating confounding",{
+  library(dplyr)
+  data("shrink_R")
+  data("cohort_SNP")
+  library(LDshrink)
+  data("map_dat")
+  n <- 1000
+  p <- nrow(shrink_R)
+  R <- diag(p)
+  #generate PSD LD matrix
+  pve <- 0.5
+  bias <- 0
+  nreps <- 5
+  diag_sim <- gen_sim_direct_evd(diag(p),D = rep(1,p),pve = pve,bias = bias,nreps = nreps,n=n,p = p,gen_quh = T)
+  rss_res <-  imap_dfr(as_data_frame(diag_sim$quh_mat),function(quh,fgeneid,D,p_n){
+    RSSp(fgeneid = fgeneid,D = D,quh = quh,p_n =p_n ,doConfound = F)
+  },p_n=p/n,D=Dl) %>% inner_join(diag_sim$tparam_df)
+  expect_equal(rss_res$sigu,rss_res$tsigu,tolerance=0.2)
+})
+
+test_that("We can estimate parameters with direct simulations really well without using the identity",{
+  library(dplyr)
+  data("shrink_R")
+  data("cohort_SNP")
+  library(LDshrink)
+  data("map_dat")
+  n <- 1000
+  p <- nrow(shrink_R)
+  R <- shrink_R
+  #generate PSD LD matrix
+  pve <- 0.5
+  bias <- 0
+  nreps <- 5
+  evdR <- eigen(R)
+  diag_sim <- gen_sim_direct_evd(Q = evdR$vectors  ,D = evdR$values,pve = pve,bias = bias,nreps = nreps,n=n,p = p,gen_quh = T)
+  
+  # t_sigu <- diag_sim$tparam_df$tsigu[1]
+  # sigu_range <- seq(t_sigu*0.5,t_sigu*1.5,length.out = 1000)
+  # bias_range <- 0
+  # lnzvec <- numeric(length(sigu_range))
+  # for(i in 1:length(lnzvec)){
+  #   lnzvec[i] <- RSSp_evd_mvd(par = c(sigu_range[i],bias),dvec = D,quh = quh)
+  # }
+  # plot(sigu_range,lnzvec)
+  # outer(X = pve_range,Y = bias_range,FUN = function(pve,bias,D,quh){
+  #   },D=evdR$values,quh=diag_sim$bias_uh_mat[,1])
+  
+  rss_res <-  imap_dfr(as_data_frame(diag_sim$quh_mat),function(quh,fgeneid,D,p_n){
+    RSSp(fgeneid = fgeneid,D = D,quh = quh,p_n =p_n ,doConfound = F)
+  },p_n=p/n,D=evdR$values) %>% inner_join(diag_sim$tparam_df)
+  expect_equal(rss_res$sigu,rss_res$tsigu,tolerance=0.2)
+})
+
+
+
+
+
+test_that("My gradient is the same as the stan gradient",{
+  
+  tparam <- runif(2)
+  dvec <- runif(5)
+  quh <- rnorm(5)
+  expect_equal(evd_dnorm_grad_stan(par=tparam,dvec = dvec,quh = quh)[-1],evd_dnorm_grad(par = tparam,dvec = dvec,quh = quh))
+  
+  
+  
+})
+
+test_that("My cpp mvd transformation is the sam as the R version",{
+  
+  
+  data("shrink_R")
+  data("cohort_SNP")
+  library(LDshrink)
+  t_evd <- eigen(shrink_R)
+  Q <- t_evd$vectors
+  p <- nrow(Q)
+  n <- 4
+  D <- t_evd$values
+  sigu <- 0.03
+  bias <- 0.001
+  nreps <- 2
+  usim <- t(matrix(rnorm(n = p*nreps),nrow=nreps,byrow = T))
+  
+    nd <- sigu^2*D^2+D+bias
+    A <- (t(Q) * sqrt(pmax(nd, 0)))
+    uhmat <- A%*%usim
+    colnames(uhmat) <- fgeneids
+  #   return(uhmat)
+  # }
+
+  tsA =sim_uh_A(sigu,bias,Q,D,NULL,usim)
+  cppA = simuh_dir_cpp(sigu,bias,nreps,Q,D,"",usim)
+  expect_equal(cppA,tsA)
+    
+})
 
 # test_that("Gradient works as expected (similar to numeric gradient)",{
 #   

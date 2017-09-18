@@ -223,8 +223,18 @@ sim_S <- function(index,x,sigu){
 }
 
 
+calc_p <- function(gds){
+  length(seqGetData(gds,"variant.id"))
+}
 
-gen_ty_block_gds <- function(gds,tparam_df,seed=NULL,chunksize=10000,cores=1){
+sim_S_beta <- function(x){
+  sx <- scale(x$dosage,center=T,scale=F)
+  ty <- sx%*%x$beta
+  return(ty)
+}
+
+
+gen_ty_block_gds <- function(gds,tparam_df,seed=NULL,chunksize=10000,cores=1,use_beta=F){
   library(SeqArray)
   library(LDshrink)
   library(dplyr)
@@ -235,17 +245,76 @@ gen_ty_block_gds <- function(gds,tparam_df,seed=NULL,chunksize=10000,cores=1){
   # gds <- seqOpen(gds_file,readonly = T)
   isHaplo <- LDshrink::is_haplo(gds)
   stopifnot(!isHaplo)
+  chunksize <- min(c(calc_p(gds),chunksize))
+  if(use_beta){
+    S_U <- seqBlockApply(gds,c(dosage="$dosage",beta="annotation/info/beta_mat"),
+                         sim_S_beta,
+                         margin="by.variant",
+                         as.is = "list",
+                         .progress = T,
+                         bsize = chunksize,parallel=cores)
+    
+    ty <- Reduce("+",S_U)
+    return(ty)
+  }
 
   S_U <- seqBlockApply(gds,c(x="$dosage"),
-                                 sim_S,
-                                 margin="by.variant",
-                                 as.is = "list",
-                                 .progress = T,var.index="relative",
-                                 sigu=tparam_df$tsigu,bsize = chunksize,parallel=cores)
-  
+                       sim_S,
+                       margin="by.variant",
+                       as.is = "list",
+                       .progress = T,var.index="relative",
+                       sigu=tparam_df$tsigu,bsize = chunksize,parallel=cores)
   
   ty <- Reduce("+",S_U)
   return(ty)
+}
+
+
+map_bh_se_gds <- function(gds,ymat,chunksize=10000,out_file=tempfile()){
+  library(SeqArray)
+  library(RSSReQTL)
+  library(readr)
+  library(tidyr)
+  library(dplyr)
+  
+  
+  map_append <-function(x,ymat,out_file){
+    rsid=x$rsid
+    allele=x$allele
+    chrom=x$chrom
+    pos=x$pos
+    x_g <- x$x
+    
+    sx <- scale(x_g,center=T,scale=F)
+    
+    betahat <- RSSReQTL::map_beta_exp(sx, ymat)
+    se_mat <- RSSReQTL::map_se_exp(sx, ymat, betahat)
+    colnames(betahat) <- colnames(ymat)
+    colnames(se_mat) <- colnames(ymat)
+    tdf <- tibble::data_frame(SNP=rsid,
+                              allele=allele) %>% 
+      separate(allele,into = c("A1","A2"),sep = ",") %>% 
+      mutate(snp_id=1:n())
+    b_hat<- as_data_frame(betahat) %>% mutate(snp_id=1:n()) %>% 
+      gather(fgeneid,beta_hat,-snp_id)
+    tdf<- as_data_frame(se_mat) %>% mutate(snp_id=1:n()) %>% 
+      gather(fgeneid,se_hat,-snp_id) %>% inner_join(b_hat) %>% 
+      inner_join(tdf) %>% 
+      select(SNP,A1,A2,beta_hat,se_hat,fgeneid)
+    write_delim(x = tdf,path = out_file,delim = "\t",append = T,col_names = F)
+    return(rsid)
+  }
+  
+  
+  result <- seqBlockApply(gds,c(x="$dosage",rsid="annotation/id",
+                                allele="allele",
+                                chrom="chromosome",
+                                pos="position"),
+                          FUN=map_append,ymat=ymat,out_file=out_file,
+                          margin="by.variant",
+                          as.is = "list",
+                          .progress = T,bsize = chunksize,parallel=F)
+  return(out_file)
 }
 
 
@@ -253,17 +322,17 @@ gen_ty_block_gds <- function(gds,tparam_df,seed=NULL,chunksize=10000,cores=1){
 gen_bhat_se_block_gds <- function(gds,ymat,cores,tparam_df,chunksize=10000,na.rm=F){
   library(SeqArray)
   library(RSSReQTL)
-
+  
   uh_matl <- seqBlockApply(gds,c(x="$dosage"),
-                                     function(x,ymat){
-                                       sx <- scale(x,center=T,scale=F)
-                                       betahat <- RSSReQTL::map_beta_exp(sx, ymat)
-                                       se_mat <- RSSReQTL::map_se_exp(sx, ymat, betahat)
-                                       return(betahat/se_mat)
-                                     },ymat=ymat,
-                                     margin="by.variant",
-                                     as.is = "list",
-                                     .progress = T,bsize = chunksize,parallel=cores)
+                           function(x,ymat){
+                             sx <- scale(x,center=T,scale=F)
+                             betahat <- RSSReQTL::map_beta_exp(sx, ymat)
+                             se_mat <- RSSReQTL::map_se_exp(sx, ymat, betahat)
+                             return(betahat/se_mat)
+                           },ymat=ymat,
+                           margin="by.variant",
+                           as.is = "list",
+                           .progress = T,bsize = chunksize,parallel=cores)
   uh_mat <- do.call("rbind",uh_matl)
   p <- nrow(uh_mat)
   colnames(uh_mat) <- as.character(tparam_df$fgeneid)
@@ -279,7 +348,7 @@ gen_bhat_se_block_gds <- function(gds,ymat,cores,tparam_df,chunksize=10000,na.rm
 
 
 
-gen_sim_phenotype_gds <- function(gds,tparam_df,seed=NULL,chunksize=10000,fgeneid=NULL,cores=1){
+gen_sim_phenotype_gds <- function(gds,tparam_df,seed=NULL,chunksize=10000,fgeneid=NULL,cores=1,use_beta=F){
   
   library(SeqArray)
   library(LDshrink)
@@ -294,7 +363,7 @@ gen_sim_phenotype_gds <- function(gds,tparam_df,seed=NULL,chunksize=10000,fgenei
   ty <- gen_ty_block_gds(gds = gds,
                          tparam_df = tparam_df,
                          seed = seed,
-                         chunksize = chunksize,cores=cores)
+                         chunksize = chunksize,cores=cores,use_beta=use_beta)
   
   
   vy <- apply(ty, 2, var)

@@ -32,7 +32,7 @@ test_that("Simulating from gds works the same as simulating from SNP data",{
 
 
 
-test_that("We can get from haplotype to genotype effectively",{
+test_that("
   
   
 })
