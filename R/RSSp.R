@@ -250,7 +250,16 @@ chunk_mat_rows <- function(mat,factor,index){
   return(retmatl)
 }
 
-
+gen_quh_chunk <- function(gwas_df,evdf){
+  library(RcppEigenH5)
+  gwas_cols <- colnames(gwas_df)
+  LD_info <- read_df_h5(evdf,"LDinfo") %>% mutate(evd_index=1:n()) %>% inner_join(gwas_df) %>% arrange(evd_index)
+  
+  Dvec <- read_dvec(evdf,"EVD","D")[LD_info$evd_index]
+  Q <- read_2d_index_h5(evdf,"EVD","Q",LD_info$evd_index)[LD_info$evd_index,]
+  LD_info <- mutate(LD_info,quh=crossprod(Q,Z),D=Dvec) %>% select(one_of(gwas_cols),quh,D)
+  return(LD_info)
+}
 
 
 quh_mat <- function(Ql,uhmat){

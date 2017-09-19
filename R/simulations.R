@@ -1,6 +1,12 @@
 #Code for generating simulations
 
-
+#' Generate parameters of simulation
+#' @param pve true PVE
+#' @param bias true value for bias
+#' @param nreps number of repetitions of each combo of parameters
+#' @n sample size
+#' @p number of SNPs
+#' @fgeneid name for each trait (defaults to 1:ntraits)
 gen_tparamdf_norm <- function(pve, bias = 0, nreps, n, p,fgeneid=NULL){
   library(dplyr)
   tfgeneid <- fgeneid
@@ -223,18 +229,73 @@ sim_S <- function(index,x,sigu){
 }
 
 
+#' Generate simulated values of beta, given PVE etc.
+#' @param gds an open SeqArray gds file handle 
+#' @tparam_df A dataframe with the simulation parameter values (see `gen_tparamdf_norm`)
+#' @param seed a random seed
+#' @param chunksize number of values to create at a time
+sim_beta_gds <- function(gds,tparam_df,seed=NULL,chunksize=10000){
+  
+  sim_beta <- function(x,sigu,fgeneid){
+    rsid=x$rsid
+    allele=x$allele
+    chrom=x$chrom
+    pos=x$pos
+    x_g <- x$x
+    
+    sx <- scale(x_g,center=T,scale=F)
+    #I'm adding a sneaky bit in here to deal with the (extremely) rare 
+    #event where all individuals are hets at a particular locus
+    #what I'm doing is simply assigning the variant a beta of 0
+    n <- nrow(sx)
+    p <- ncol(sx)
+    u_mat <- sapply(sigu,function(tsigu,p){rnorm(n=p,mean=0,sd=tsigu)},p=p)
+    S <- 1/sqrt(n)*1/apply(sx,2,sd)
+    beta <- u_mat*S
+    beta[!is.finite(beta)]<-0
+    colnames(beta) <- fgeneid
+    tdf <- tibble::data_frame(SNP=rsid,
+                              allele=allele) %>% 
+      separate(allele,into = c("A1","A2"),sep = ",") %>% 
+      mutate(snp_id=1:n())
+
+    tdf<- as_data_frame(beta) %>% mutate(snp_id=1:n()) %>% 
+      gather(fgeneid,beta,-snp_id) %>% inner_join(tdf) %>% 
+      select(SNP,A1,A2,beta,fgeneid)
+    return(tdf)
+  }
+  
+  
+  result <- seqBlockApply(gds,c(x="$dosage",rsid="annotation/id",
+                                allele="allele",
+                                chrom="chromosome",
+                                pos="position"),
+                          FUN=sim_beta,sigu=tparam_df$tsigu,
+                          fgeneid=tparam_df$fgeneid,
+                          margin="by.variant",
+                          as.is = "list",
+                          .progress = T,bsize = chunksize,parallel=F)
+  res <- bind_rows(result)
+  return(res)
+
+}
+
+#' Find number of SNPs in thte dataset
+#' @param gds A SeqArray gds object
 calc_p <- function(gds){
   length(seqGetData(gds,"variant.id"))
 }
 
-sim_S_beta <- function(x){
-  sx <- scale(x$dosage,center=T,scale=F)
-  ty <- sx%*%x$beta
+sim_S_beta <- function(index,x,beta){
+  p <- ncol(x)
+  ix <- index+(0:(p-1))
+  sx <- scale(x,center=T,scale=F)
+  ty <- sx%*%(beta[ix,])
   return(ty)
 }
 
 
-gen_ty_block_gds <- function(gds,tparam_df,seed=NULL,chunksize=10000,cores=1,use_beta=F){
+gen_ty_block_gds <- function(gds,tparam_df,seed=NULL,chunksize=10000,cores=1,betamat=NULL){
   library(SeqArray)
   library(LDshrink)
   library(dplyr)
@@ -246,12 +307,14 @@ gen_ty_block_gds <- function(gds,tparam_df,seed=NULL,chunksize=10000,cores=1,use
   isHaplo <- LDshrink::is_haplo(gds)
   stopifnot(!isHaplo)
   chunksize <- min(c(calc_p(gds),chunksize))
-  if(use_beta){
-    S_U <- seqBlockApply(gds,c(dosage="$dosage",beta="annotation/info/beta_mat"),
+  if(!is.null(betamat)){
+    p <- calc_p(gds)
+    stopifnot(nrow(betamat)==p)
+    S_U <- seqBlockApply(gds,c(x="$dosage"),
                          sim_S_beta,
                          margin="by.variant",
-                         as.is = "list",
-                         .progress = T,
+                         as.is = "list",beta=betamat,
+                         .progress = T,var.index="relative",
                          bsize = chunksize,parallel=cores)
     
     ty <- Reduce("+",S_U)
@@ -319,6 +382,8 @@ map_bh_se_gds <- function(gds,ymat,chunksize=10000,out_file=tempfile()){
 
 
 
+
+
 gen_bhat_se_block_gds <- function(gds,ymat,cores,tparam_df,chunksize=10000,na.rm=F){
   library(SeqArray)
   library(RSSReQTL)
@@ -347,8 +412,20 @@ gen_bhat_se_block_gds <- function(gds,ymat,cores,tparam_df,chunksize=10000,na.rm
 }
 
 
+gen_sim_resid <- function(ty,tparam_df,residmat=NULL){
+  if(is.null(residmat)){
+    vy <- apply(ty, 2, var)
+    n <- nrow(ty)
+    residvec <- gen_ti(vy, tparam_df$tpve)
+    residmat <- sapply(residvec, function(ti, n){rnorm(n=n, mean=0, sd=sqrt(ti))}, n=n)
+  }
+  ymat <- scale(ty+residmat, center=T, scale=F)
+  return(ymat)
+}
 
-gen_sim_phenotype_gds <- function(gds,tparam_df,seed=NULL,chunksize=10000,fgeneid=NULL,cores=1,use_beta=F){
+
+
+gen_sim_phenotype_gds <- function(gds,tparam_df,seed=NULL,chunksize=10000,fgeneid=NULL,cores=1,betamat=NULL,residmat=NULL){
   
   library(SeqArray)
   library(LDshrink)
@@ -363,16 +440,10 @@ gen_sim_phenotype_gds <- function(gds,tparam_df,seed=NULL,chunksize=10000,fgenei
   ty <- gen_ty_block_gds(gds = gds,
                          tparam_df = tparam_df,
                          seed = seed,
-                         chunksize = chunksize,cores=cores,use_beta=use_beta)
+                         chunksize = chunksize,cores=cores,betamat=betamat)
   
-  
-  vy <- apply(ty, 2, var)
-  n <- nrow(ty)
-  residvec <- gen_ti(vy, tparam_df$tpve)
-  residmat <- sapply(residvec, function(ti, n){rnorm(n=n, mean=0, sd=sqrt(ti))}, n=n)
-  ymat <- scale(ty+residmat, center=T, scale=F)
-  return(ymat)
-  
+  return(gen_sim_resid(ty,tparam_df,residmat))
+
 }
 
 
