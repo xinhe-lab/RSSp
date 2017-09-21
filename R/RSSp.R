@@ -74,11 +74,22 @@ RSSp <- function(fgeneid=NULL,D,quh,sigu_bounds=c(1e-7,2.6),a_bounds=c(0,1),p_n,
 
 }
 
+bootstrap_RSSp <- function(fgeneid=NULL,D,quh,boot_reps=100,sigu_bounds=c(1e-7,2.6),a_bounds=c(0,1),p_n,doConfound=T,log_params=F,useGradient=T){
+  library(broom)
+  
+  tdata <- data_frame(quh=quh,D=D) %>% bootstrap(boot_reps) %>% do(RSSp(
+    fgeneid="scz",
+    D=.$D,
+    quh=.$quh,
+    p_n=p_n,
+    doConfound=doConfound,
+    log_params=log_params,
+    useGradient=useGradient))
+  return(tdata)
+}
+
 RSSp_run_mat_quh <- function(quh_mat_d,D,n,sigu_bounds=c(1e-07,2.6),a_bounds=c(0,1),doConfound=T,log_params=F,useGradient=T){
   library(dplyr)
-  library(tidyr)
-  library(SeqArray)
-  library(LDshrink)
   library(purrr)
   fgeneids <- colnames(quh_mat_d)
   stopifnot(nrow(quh_mat_d)==length(D))
@@ -87,6 +98,7 @@ RSSp_run_mat_quh <- function(quh_mat_d,D,n,sigu_bounds=c(1e-07,2.6),a_bounds=c(0
 
   quhl <- array_branch(quh_mat_d,2)
   names(quhl) <- fgeneids
+  
   return(imap_dfr(quhl,function(quh,fgeneid,D,p_n){
     RSSp(fgeneid = fgeneid,D = D,quh = quh,p_n = p_n,doConfound=doConfound,log_params=log_params,useGradient=useGradient)
     },
@@ -237,7 +249,26 @@ RSSp_estimate <- function(data_df,sigu_bounds= c(1e-7,2.6),a_bounds=c(0,1),p_n,d
                     pve=p_n*sigu^2))
 }
 
-
+sgd_RSSp <- function(quh,D,batch_size=100,nreps=100,param0=c(1e-4,0),alpha=0.01){
+  L <- numeric(nreps)
+  param_mat <- matrix(param0,nreps,2,byrow = T)
+  p <- length(quh)
+  tsamp <- sample(1:p,batch_size,replace=T)
+  tquh <- quh[tsamp]
+  tD <- D[tsamp]
+  L[1] <- evd_dnorm(par = param0,dvec = tD,quh = tquh)
+  param_mat[1,] <- param_mat[1,]- alpha*evd_dnorm_grad(par = param_mat[1,],dvec = tD,quh = tquh)
+  
+  for(i in 2:nreps){
+    tsamp <- sample(1:p,batch_size,replace=T)
+    tquh <- quh[tsamp]
+    tD <- D[tsamp]
+    L[i] <- evd_dnorm(par = param_mat[i-1,],dvec = tD,quh = tquh)
+    param_mat[i,] <- param_mat[i-1,]- alpha*evd_dnorm_grad(par = param_mat[i-1,],dvec = tD,quh = tquh)
+    stopifnot(all(param_mat>0))
+  }
+  
+}
 
 
 chunk_mat_rows <- function(mat,factor,index){
@@ -250,14 +281,52 @@ chunk_mat_rows <- function(mat,factor,index){
   return(retmatl)
 }
 
+
+gen_quh_chunk_mat <- function(Zmat,evdf,gw_snpi){
+  library(RcppEigenH5)
+  ld_snpi <- read_ivec(evdf,"LDinfo","snp_id")
+  p <-length(gw_snpi)
+  subset_cols <- match_sorted(gw_snpi,target = ld_snpi)+1
+  if(length(subset_cols)==length(ld_snpi)){
+    Dvec <- read_dvec(evdf,"EVD","D")
+    Q <- read_2d_mat_h5(h5file = evdf,groupname = "EVD",dataname = "Q")
+  }else{
+    tR <- read_2d_index_h5(
+      h5file = evdf,
+      groupname = "LD",
+      dataname = "R",
+      indvec = subset_cols)[subset_cols,]
+    evdR <- eigen(tR)
+    Dvec <- evdR$values
+    Q <- evdR$vectors
+  }
+  stopifnot(all.equal(sum(Dvec),p))
+  quh <- crossprod(Q,Zmat)
+  colnames(quh) <- colnames(Zmat)
+  return(list(quh=quh,D=Dvec,snp_id=gw_snpi))
+}
+
 gen_quh_chunk <- function(gwas_df,evdf){
   library(RcppEigenH5)
-  gwas_cols <- colnames(gwas_df)
-  LD_info <- read_df_h5(evdf,"LDinfo") %>% mutate(evd_index=1:n()) %>% inner_join(gwas_df) %>% arrange(evd_index)
-  
-  Dvec <- read_dvec(evdf,"EVD","D")[LD_info$evd_index]
-  Q <- read_2d_index_h5(evdf,"EVD","Q",LD_info$evd_index)[LD_info$evd_index,]
-  LD_info <- mutate(LD_info,quh=crossprod(Q,Z),D=Dvec) %>% select(one_of(gwas_cols),quh,D)
+  ld_snpi <- read_ivec(evdf,"LDinfo","snp_id")
+  gw_snpi <- gwas_df$snp_id
+  p <-length(gw_snpi)
+  subset_cols <- match_sorted(gw_snpi,target = ld_snpi)+1
+  if(length(subset_cols)==length(ld_snpi)){
+    Dvec <- read_dvec(evdf,"EVD","D")
+    Q <- read_2d_mat_h5(h5file = evdf,groupname = "EVD",dataname = "Q")
+  }else{
+    tR <- read_2d_index_h5(
+      h5file = evdf,
+      groupname = "LD",
+      dataname = "R",
+      indvec = subset_cols)[subset_cols,]
+    evdR <- eigen(tR)
+    Dvec <- evdR$values
+    Q <- evdR$vectors
+  }
+  stopifnot(all.equal(sum(Dvec),p))
+  LD_info <- mutate(gwas_df,quh=crossprod(Q,Z),D=Dvec)
   return(LD_info)
 }
 
