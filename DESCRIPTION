@@ -5,10 +5,11 @@ Version: 0.9
 Date: 2017-08-07
 Author: Nicholas Knoblauch
 Maintainer: Nicholas Knoblauch <nwknoblauch@gmail.com>
-Description: More about what it does (maybe more than one line)
+Description: Implementation of the Regression with Summary Statistics (RSS) method using a polygenic (normal)
 License: What license is it under?
 Imports: Rcpp (>= 0.12.12), RcppEigen (>= 0.3.3.3.0),StanHeaders,BH
 LinkingTo: Rcpp, RcppEigen,StanHeaders,BH
 Remotes: CreRecombinase/RSSReQTL (>= 1.1.1), CreRecombinase/RcppEigenH5 (>= 0.2.0) 
-Suggests: testthat
+Suggests: testthat,
+    covr
 RoxygenNote: 6.0.1

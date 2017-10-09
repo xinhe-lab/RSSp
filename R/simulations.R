@@ -2,11 +2,11 @@
 
 #' Generate parameters of simulation
 #' @param pve true PVE
-#' @param bias true value for bias
+#' @param bias true value for bias/confounding
 #' @param nreps number of repetitions of each combo of parameters
-#' @n sample size
-#' @p number of SNPs
-#' @fgeneid name for each trait (defaults to 1:ntraits)
+#' @param n sample size
+#' @param p number of SNPs
+#' @param fgeneid name for each trait (defaults to 1:ntraits)
 gen_tparamdf_norm <- function(pve, bias = 0, nreps, n, p,fgeneid=NULL){
   library(dplyr)
   tfgeneid <- fgeneid
@@ -21,200 +21,162 @@ gen_tparamdf_norm <- function(pve, bias = 0, nreps, n, p,fgeneid=NULL){
     group_by(tpve, tbias) %>%
     mutate(replicate=1:n()) %>%
     ungroup() %>%
-    mutate(fgeneid=1:n(), tsigu=sqrt(n/p*tpve),tbias=tpve*tbias) %>% 
+    mutate(fgeneid=as.character(1:n()), tsigu=sqrt(n/p*tpve),tbias=tpve*tbias) %>%
     select(-replicate)
   if(!is.null(tfgeneid)){
     stopifnot(nrow(rfp)==length(tfgeneid))
-    rfp <- mutate(rfp,fgeneid=tfgeneid)
+    rfp <- mutate(rfp,fgeneid=as.character(tfgeneid))
   }
   return(rfp)
 }
 
 
-
+#' calculate the scale of residuals, given X*Beta and the target PVE
+#' @param vy vector with the variance of y (length is equal to the number of traits)
+#' @param PVE vector specifying the target PVE (length should be the same as the number of traits)
 gen_ti <- function(vy, PVE){
+  stopifnot(length(vy)==length(PVE))
   return(vy*(1/PVE-1))
 }
 
+
+#' read log from LD score regression (as implemented in `ldsc`), and parse it so results can be compared to RSSp
+#' @param h2lf path (absolute or relative) to `ldsc` (character)
 parse_ldsc_h2log <- function(h2lf){
-  library(purrr)
-  library(tidyr)
+#  library(purrr)
+#  library(tidyr)
   h2_dat <- scan(h2lf,what=character(),sep = "\n")
   h2_rowi <- grep("Total Observed scale",h2_dat)
   h2_row <- h2_dat[h2_rowi]
   h2_data <- h2_dat[h2_rowi:length(h2_dat)]
   h2_data <- h2_data[grep("^[^:]+:[^:]+$",h2_data)]
-  h2_datd <- transpose(strsplit(h2_data,split=":"))
+  h2_datd <- purrr::transpose(strsplit(h2_data,split=":"))
   names(h2_datd) <- c("Variable","Value")
-  h2_datdf <- unnest(as_data_frame(h2_datd)) %>% mutate(Variable=chartr(" ^","__",Variable),Value=trimws(Value)) %>% separate(Value,c("Est","SD"),sep = "[ s\\(\\)]+",remove=T,fill="right",convert=T)
+  h2_datdf <- tidyr::unnest(as_data_frame(h2_datd)) %>%
+    dplyr::mutate(Variable=chartr(" ^","__",Variable),Value=trimws(Value)) %>% 
+    tidyr::separate(Value,c("Est","SD"),sep = "[ s\\(\\)]+",remove=T,fill="right",convert=T)
   return(h2_datdf)
 }
 
 
-
-sim_uh_A <- function(sigu,bias,Q,D,fgeneids,usim){
+#' Transform simulated standard univariate normal data to multivariate normal, following the RSSp likelihood
+#' @param sigu desired sd of the true effect
+#' @param bias true value for bias/confounding
+#' @param Q matrix of eigenvectors of the LD matrix (must be square, and must have rank equal to nrow(usim))
+#' @param D vector of eigenvalues corresponding to Q ( must have length equal to rank of `Q`)
+#' @param fgeneid name for the trait (character)
+#' @param usim matrix of standard univariate normal data to be transformed, one column for each replicate.
+sim_uh_A <- function(sigu,bias,Q,D,fgeneid,usim){
+  stopifnot(length(unique(bias))==1,
+            length(unique(sigu))==1)
   nd <- sigu^2*D^2+D+bias
   A <- Q %*% (t(Q) * sqrt(pmax(nd, 0)))
   uhmat <- t(usim%*%A)
-  colnames(uhmat) <- fgeneids
+  colnames(uhmat) <- fgeneid
   return(uhmat)
 }
 
 
-simuh_dir <-  function(sigu,bias,Q,D,fgeneids,seed=NULL,gen_quh=F){
+
+#' "Directly" simulate data from the RSSp likelihood for a single value of `sigu` and `bias`.
+#' @param tsigu desired sd of the true effect
+#' @param tbias true value for bias/confounding
+#' @param Q matrix of eigenvectors of the LD matrix (must be square, and must have rank equal to nrow(usim))
+#' @param D vector of eigenvalues corresponding to Q ( must have length equal to rank of `Q`)
+#' @param fgeneid name for the trait (character)
+#' @param snp_id vector of IDs for the SNPs
+sim_quh_dir <- function(tsigu,tbias,fgeneid=NULL,Q,D,seed=NULL,snp_id){
   p <- nrow(Q)
   if(!is.null(seed)){
     stopifnot(is.integer(seed))
     set.seed(seed)
   }
-  nreps <- length(fgeneids[[1]])
-  fgeneids <- as.character(fgeneids[[1]])
+  sigu <- unique(tsigu)
+  bias <- unique(tbias)
+  nreps <- length(fgeneid)
 
+  stopifnot(length(sigu)==length(bias),
+            length(nreps)==length(sigu),
+            length(sigu)==1,!is.null(fgeneid))
+
+  fgeneid <- as.character(fgeneid)
 
   usim <- matrix(rnorm(n = p*nreps),nrow=nreps,byrow = T)
-  uhmat <- sim_uh_A(sigu,bias,Q,D,fgeneids,usim)
-  if(gen_quh){
-    quhmat <- crossprod(Q,uhmat)
-  }
+  uhmat <- sim_uh_A(sigu,bias,Q,D,fgeneid,usim)
+  quh <- crossprod(Q,uhmat)
+  colnames(quh) <- fgeneid
+  return(list(quh=quh,D=D,snp_id=snp_id))
+}
+
+
+
+#' "Directly" simulate data from the RSSp likelihood for a range of values of sigu and bias
+#' @param tsigu desired sd of the true effect (vector of length `g``, where `g` is the number of traits to be simulated)
+#' @param tbias true value for bias/confounding
+#' @param Q matrix of eigenvectors of the LD matrix (must be square, and must have rank equal to nrow(usim))
+#' @param D vector of eigenvalues corresponding to Q ( must have length equal to rank of `Q`)
+#' @param fgeneid name for the trait (character)
+#' @param snp_id vector of IDs for the SNPs
+sim_quh_dir_df <- function(tparam_df,Q,D,seed=NULL,snp_id){
+  tparam_dfl <- split(tparam_df, paste0(tparam_df$tsigu,"_",tparam_df$tbias))
+  quh <- do.call(cbind,lapply(tparam_dfl,function(l,Q,D,seed,snp_id){
+    sim_quh_dir(
+      tsigu=l$tsigu,
+      tbias=l$tbias,
+      fgeneid=l$fgeneid,
+      Q=Q,
+      D=D,
+      seed=seed,
+      snp_id=snp_id)[["quh"]]
+  },Q=Q,D=D,seed=seed,snp_id=snp_id))
+  return(list(quh=quh,D=D,snp_id=snp_id))
+}
+
+
+
+
+
+#' Estimate parameters from simulated data, saved in the specified format
+#' @param resl list with the following elements 
+#' `quh_mat`, a `p`x`g` matrix (where `p` is number of SNPs and `g` is number of traits) obtained by an
+#' operation equivalent to to `crossprod(Q,uh)`
+#' `tparam_df` a dataframe (of the type generated by the function `gen_tparamdf_norm` with true parameter values (`NA`s can also be used in the case of real data)
+#' @param Ql A list of matrices, each element representing the eigenvectors of a square block in the block diagonal approximation of the LD matrix (blocks need not be of equal size) 
+#' @param D A vector of the eigenvectors of the LD matrix (must be length `p`)
+#' @param doConfound a logical indicating whether to use the two parameter model (`doConfound=T`) or the one parameter model without confounding
+#' @param log_params a logical indicating whether to optimize parameters in log space or not (not recommended)
+#' @param a_bounds a length two vector indicating the bounds of the parameter `a` to use when optimizing, `a` is a measure of confounding
+#' @param sigu_bounds a length two vector indicating bounds in the parameter `sigu` to use when optimizing `sigu` is directly related to PVE
+est_sim <- function(resl,Ql=NULL,D=NULL,doConfound=T,log_params=F,useGradient=T,bias_bounds=c(0,.3),pve_bounds=c(1e-4,1)){
   
-  colnames(uhmat) <- fgeneids
-  if(gen_quh){
-    colnames(quhmat) <- fgeneids
-  }
-  retdf <- as_data_frame(uhmat) %>% mutate(snp_index=as.character(1:n())) %>% gather(fgeneid,uh,-snp_index) %>% mutate(tsigu=sigu,tbias=bias)
-  if(gen_quh){  
-    retdf <- as_data_frame(quhmat) %>% mutate(snp_index=as.character(1:n())) %>% gather(fgeneid,quh,-snp_index) %>% mutate(tsigu=sigu,tbias=bias) %>% inner_join(retdf,by=c("snp_index","fgeneid","tsigu","tbias"))
-  }
-  return(retdf)
-}
-
-
-estimate_RSSp_files <- function(evdf,simf,genof,chunksize,R_dataname="R",doConfound=T,doNoConfound=F,doLog=F,useGradient=T,result_dir=tempdir(),use_ldetect=F){
-  library(purrr)
-  library(dplyr)
-  library(RcppEigenH5)
-  library(tidyr)
-
-  stopifnot((doConfound+doNoConfound)>0)
-  library(LDshrink)
-  if(!file.exists(evdf)){
-    datal <- write_eigen_chunks(genof,evdf,chunksize,dataname=R_dataname)
-  }else{
-    if(!group_exists(evdf,as.character(chunksize))){
-      datal <- write_eigen_chunks(genof,evdf,chunksize,dataname=R_dataname)
-    }else{
-      datal <- read_eigen_chunks(evdf,chunksize)
-    }
-  }
-  base_simf <- basename(simf)
-
-  asimd <- readRDS(simf)
-  sim_md5 <- asimd[["md5"]]
-  uhmat <- asimd[["bias_uh_mat"]]
-  if(is.null(sim_md5)){
-    asimd[["md5"]] <- PKI::PKI.digest(as.raw(asimd[["bias_uh_mat"]]))
-    sim_md5 <- asimd[["md5"]]
-    saveRDS(asimd,simf)
-  }
-  if(!dir.exists(result_dir)){
-    dir.create(result_dir,recursive=T)
-  }
-  result_f <- file.path(result_dir,base_simf)
-  # if(file.exists(result_f)){
-  #   # resultl <- readRDS(result_f)
-  #   # res_md5 <- resultl[["md5"]]
-  #   # if(res_md5==sim_md5){
-  #   #   t_res <- resultl[["result"]]
-  #   # }
-  # }else{
-    p <- asimd$p
-    n <- asimd$n
-    
-    prep_dfl <- prep_RSSp_evd(Ql=datal[["Ql"]],
-                              Dl=datal[["Dl"]],
-                              U=uhmat,N=n)
-    df_l <- split(prep_dfl,prep_dfl$fgeneid) 
-    cf_res <- NULL
-    ncf_res <- NULL
-    
-    if(doConfound){
-      cf_res <- bind_rows(lapply(df_l,RSSp_estimate,p_n=p/n,doConfound=T,log_params=doLog,useGradient=useGradient))
-    }
-    if(doNoConfound){
-      ncf_res <- bind_rows(lapply(df_l,RSSp_estimate,p_n=p/n,doConfound=F,log_params=doLog,useGradient=useGradient))
-    }
-    f_res <- bind_rows(cf_res,ncf_res)
-    stopifnot(!is.null(f_res))
-    t_res <- mutate(asimd$tparam_df,fgeneid=as.character(fgeneid),chunksize=chunksize) %>% inner_join(f_res)
-    resultl <- list(result=t_res,md5=sim_md5)
-    saveRDS(resultl,result_f)
-  # }
-  return(t_res)
-}
-# 
-# est_sim_evdf <- function(evdf,resl){
-#   library(LDshrink)
-#   library(RcppEigen)
-#   resl$quh_mat <- sparse_matmul()
-#   
-# }
-
-
-
-est_sim <- function(resl,Ql=NULL,D=NULL,doConfound=T,log_params=F,useGradient=T,a_bounds=c(0,.3),sigu_bounds=c(1e-4,1.5)){
-  library(purrr)
-  library(dplyr)
-  stopifnot(!is.null(D))  
+  stopifnot(!is.null(D))
   if(is.null(Ql)){
     stopifnot(!is.null(resl$quh_mat))
   }
   if(is.null(resl$quh_mat)){
     resl$quh_mat <- quh_mat(Ql,resl$bias_uh_mat)
   }
-  rss_res <- cross(list(doConfound=doConfound,log_params=log_params,useGradient=useGradient)) %>% 
-    invoke_map_dfr("RSSp_run_mat_quh",.,quh_mat_d=resl$quh_mat,D=D,n=resl$n) %>% inner_join(resl$tparam_df)
+  p_n <- resl$p/resl$n
+  sigu_bounds <- calc_sigu(pve_bounds,p_n)
+  
+  rss_res <- purrr::cross(list(doConfound=doConfound,log_params=log_params,useGradient=useGradient)) %>%
+    purrr::invoke_map_dfr(
+      "RSSp_run_mat_quh",
+      .,
+      quh_mat_d=resl$quh_mat,
+      D=D,
+      n=resl$n,
+      a_bounds=bias_bounds,
+      sigu_bounds=sigu_bounds) %>% dplyr::inner_join(resl$tparam_df)
   return(rss_res)
 }
 
-    
-gen_sim_direct_evd <- function(Q,D,pve,bias=0,nreps,n,p,fgeneid=NULL,gen_quh=F){
-  library(dplyr)
-  library(purrr)
-  library(tidyr)
-  tparam_df <- gen_tparamdf_norm(pve,bias,nreps,n,p,fgeneid) %>%  
-    group_by(tpve,tbias,tsigu) %>% 
-    mutate(fgeneid=as.character(fgeneid)) %>% 
-    nest(fgeneid)
-  asims <- tparam_df %>% rowwise() %>% do(simuh_dir(sigu = .$tsigu,bias = .$tbias,Q = Q,D=D,fgeneids = .$data,gen_quh=gen_quh))
-  if(gen_quh){
-    quh_mat <- select(asims,snp_index,fgeneid,quh) %>% spread(key = fgeneid,value = quh) %>% select(-snp_index) %>% data.matrix
-  }
-  bias_uh_mat <- select(asims,snp_index,fgeneid,uh) %>% spread(key = fgeneid,value = uh) %>% select(-snp_index) %>% data.matrix
-  tparam_df <- unnest(tparam_df)
-  retl <- list(bias_uh_mat=bias_uh_mat,
-               tparam_df=tparam_df, n=n, p=p)
-  if(gen_quh){
-    retl[["quh_mat"]] <- quh_mat
-  }
-  return(retl)
-}
-    
 
-gen_sim_direct <- function(R,pve,bias=0,nreps,n=NULL,gen_quh=F){
-  stopifnot(isSymmetric(R),!is.null(n))
-  library(dplyr)
-  library(purrr)
-  library(tidyr)
-  evdR <- eigen(R)
-  Q <- evdR$vectors
-  D <- evdR$values
-  p <- nrow(R)
-  return(gen_sim_direct_evd(Q,D,pve,bias,nreps,n,p,gen_quh))
-}
+
 
 
 sim_S <- function(index,x,sigu){
-  #I'm adding a sneaky bit in here to deal with the (extremely) rare 
+  #I'm adding a sneaky bit in here to deal with the (extremely) rare
   #event where all individuals are hets at a particular locus
   #what I'm doing is simply assigning the variant a beta of 0
   n <- nrow(x)
@@ -230,21 +192,21 @@ sim_S <- function(index,x,sigu){
 
 
 #' Generate simulated values of beta, given PVE etc.
-#' @param gds an open SeqArray gds file handle 
-#' @tparam_df A dataframe with the simulation parameter values (see `gen_tparamdf_norm`)
+#' @param gds an open SeqArray gds file handle
+#' @param tparam_df A dataframe with the simulation parameter values (see `gen_tparamdf_norm`)
 #' @param seed a random seed
 #' @param chunksize number of values to create at a time
 sim_beta_gds <- function(gds,tparam_df,seed=NULL,chunksize=10000){
-  
+
   sim_beta <- function(x,sigu,fgeneid){
     rsid=x$rsid
     allele=x$allele
     chrom=x$chrom
     pos=x$pos
     x_g <- x$x
-    
+
     sx <- scale(x_g,center=T,scale=F)
-    #I'm adding a sneaky bit in here to deal with the (extremely) rare 
+    #I'm adding a sneaky bit in here to deal with the (extremely) rare
     #event where all individuals are hets at a particular locus
     #what I'm doing is simply assigning the variant a beta of 0
     n <- nrow(sx)
@@ -255,17 +217,17 @@ sim_beta_gds <- function(gds,tparam_df,seed=NULL,chunksize=10000){
     beta[!is.finite(beta)]<-0
     colnames(beta) <- fgeneid
     tdf <- tibble::data_frame(SNP=rsid,
-                              allele=allele) %>% 
-      separate(allele,into = c("A1","A2"),sep = ",") %>% 
+                              allele=allele) %>%
+      separate(allele,into = c("A1","A2"),sep = ",") %>%
       mutate(snp_id=1:n())
 
-    tdf<- as_data_frame(beta) %>% mutate(snp_id=1:n()) %>% 
-      gather(fgeneid,beta,-snp_id) %>% inner_join(tdf) %>% 
+    tdf<- as_data_frame(beta) %>% mutate(snp_id=1:n()) %>%
+      gather(fgeneid,beta,-snp_id) %>% inner_join(tdf) %>%
       select(SNP,A1,A2,beta,fgeneid)
     return(tdf)
   }
-  
-  
+
+
   result <- seqBlockApply(gds,c(x="$dosage",rsid="annotation/id",
                                 allele="allele",
                                 chrom="chromosome",
@@ -280,11 +242,19 @@ sim_beta_gds <- function(gds,tparam_df,seed=NULL,chunksize=10000){
 
 }
 
-#' Find number of SNPs in thte dataset
+#' Find number of SNPs in the dataset
 #' @param gds A SeqArray gds object
 calc_p <- function(gds){
-  length(seqGetData(gds,"variant.id"))
+  length(SeqArray::seqGetData(gds,"variant.id"))
 }
+
+#' Find number of individuals in the dataset
+#' @param gds A SeqArray gds object
+calc_N <- function(gds){
+  length(SeqArray::seqGetData(gds,"sample.id"))
+}
+
+
 
 sim_S_beta <- function(index,x,beta){
   p <- ncol(x)
@@ -296,10 +266,6 @@ sim_S_beta <- function(index,x,beta){
 
 
 gen_ty_block_gds <- function(gds,tparam_df,seed=NULL,chunksize=10000,cores=1,betamat=NULL){
-  library(SeqArray)
-  library(LDshrink)
-  library(dplyr)
-  library(purrr)
   if(!is.null(seed)){
     set.seed(seed)
   }
@@ -310,37 +276,31 @@ gen_ty_block_gds <- function(gds,tparam_df,seed=NULL,chunksize=10000,cores=1,bet
   if(!is.null(betamat)){
     p <- calc_p(gds)
     stopifnot(nrow(betamat)==p)
-    S_U <- seqBlockApply(gds,c(x="$dosage"),
+    S_U <- SeqArray::seqBlockApply(gds,c(x="$dosage"),
                          sim_S_beta,
                          margin="by.variant",
                          as.is = "list",beta=betamat,
                          .progress = T,var.index="relative",
                          bsize = chunksize,parallel=cores)
-    
+
     ty <- Reduce("+",S_U)
     return(ty)
   }
 
-  S_U <- seqBlockApply(gds,c(x="$dosage"),
+  S_U <- SeqArray::seqBlockApply(gds,c(x="$dosage"),
                        sim_S,
                        margin="by.variant",
                        as.is = "list",
                        .progress = T,var.index="relative",
                        sigu=tparam_df$tsigu,bsize = chunksize,parallel=cores)
-  
+
   ty <- Reduce("+",S_U)
   return(ty)
 }
 
 
 map_bh_se_gds <- function(gds,ymat,chunksize=10000,out_file=tempfile()){
-  library(SeqArray)
-  library(RSSReQTL)
-  library(readr)
-  library(tidyr)
-  library(dplyr)
-  
-  
+
   map_append <-function(x,ymat,out_file){
     rsid=x$rsid
     allele=x$allele
@@ -355,28 +315,28 @@ map_bh_se_gds <- function(gds,ymat,chunksize=10000,out_file=tempfile()){
     colnames(betahat) <- colnames(ymat)
     colnames(se_mat) <- colnames(ymat)
     tdf <- tibble::data_frame(SNP=rsid,
-                              allele=allele) %>% 
-      separate(allele,into = c("A1","A2"),sep = ",") %>% 
-      mutate(snp_id=1:n())
-    b_hat<- as_data_frame(betahat) %>% mutate(snp_id=1:n()) %>% 
-      gather(fgeneid,beta_hat,-snp_id)
-    tdf<- as_data_frame(se_mat) %>% mutate(snp_id=1:n()) %>% 
-      gather(fgeneid,se_hat,-snp_id) %>% inner_join(b_hat) %>% 
-      inner_join(tdf) %>% 
-      select(SNP,A1,A2,beta_hat,se_hat,fgeneid)
-    write_delim(x = tdf,path = out_file,delim = "\t",append = T,col_names = F)
+                              allele=allele) %>%
+      tidyr::separate(allele,into = c("A1","A2"),sep = ",") %>%
+      dplyr::mutate(snp_id=1:n())
+    b_hat<- as_data_frame(betahat) %>% dplyr::mutate(snp_id=1:n()) %>%
+      tidyr::gather(fgeneid,beta_hat,-snp_id)
+    tdf<- as_data_frame(se_mat) %>% dplyr::mutate(snp_id=1:n()) %>%
+      tidyr::gather(fgeneid,se_hat,-snp_id) %>% dplyr::inner_join(b_hat) %>%
+      dplyr::inner_join(tdf) %>%
+      dplyr::select(SNP,A1,A2,beta_hat,se_hat,fgeneid)
+    readr::write_delim(x = tdf,path = out_file,delim = "\t",append = T,col_names = F)
     return(rsid)
   }
   
   
-  result <- seqBlockApply(gds,c(x="$dosage",rsid="annotation/id",
-                                allele="allele",
-                                chrom="chromosome",
-                                pos="position"),
-                          FUN=map_append,ymat=ymat,out_file=out_file,
-                          margin="by.variant",
-                          as.is = "list",
-                          .progress = T,bsize = chunksize,parallel=F)
+  result <- SeqArray::seqBlockApply(gds,c(x="$dosage",rsid="annotation/id",
+                                          allele="allele",
+                                          chrom="chromosome",
+                                          pos="position"),
+                                    FUN=map_append,ymat=ymat,out_file=out_file,
+                                    margin="by.variant",
+                                    as.is = "list",
+                                    .progress = T,bsize = chunksize,parallel=F)
   return(out_file)
 }
 
@@ -385,10 +345,8 @@ map_bh_se_gds <- function(gds,ymat,chunksize=10000,out_file=tempfile()){
 
 
 gen_bhat_se_block_gds <- function(gds,ymat,cores,tparam_df,chunksize=10000,na.rm=F){
-  library(SeqArray)
-  library(RSSReQTL)
-  
-  uh_matl <- seqBlockApply(gds,c(x="$dosage"),
+
+  uh_matl <- SeqArray::seqBlockApply(gds,c(x="$dosage"),
                            function(x,ymat){
                              sx <- scale(x,center=T,scale=F)
                              betahat <- RSSReQTL::map_beta_exp(sx, ymat)
@@ -426,22 +384,15 @@ gen_sim_resid <- function(ty,tparam_df,residmat=NULL){
 
 
 gen_sim_phenotype_gds <- function(gds,tparam_df,seed=NULL,chunksize=10000,fgeneid=NULL,cores=1,betamat=NULL,residmat=NULL){
-  
-  library(SeqArray)
-  library(LDshrink)
-  library(dplyr)
-  library(purrr)
+
   if(!is.null(seed)){
     set.seed(seed)
   }
-  
-
-  
   ty <- gen_ty_block_gds(gds = gds,
                          tparam_df = tparam_df,
                          seed = seed,
                          chunksize = chunksize,cores=cores,betamat=betamat)
-  
+
   return(gen_sim_resid(ty,tparam_df,residmat))
 
 }
@@ -451,11 +402,11 @@ gen_sim_phenotype_gds <- function(gds,tparam_df,seed=NULL,chunksize=10000,fgenei
 gen_sim_gds <- function(gds,pve,bias=0,nreps=1,seed=NULL,chunksize=10000,fgeneid=NULL,evdf=NULL,cores=1){
 
   tparam_df <- gen_tparamdf_norm(pve, bias, nreps, n, p,fgeneid=fgeneid)
-  
-  
+
+
   ymat <- gen_sim_phenotype_gds(gds,tparam_df,seed,chunksize,fgeneid,cores)
   bias_uh_mat <- gen_bhat_se_block_gds(gds,ymat,cores,tparam_df)
-  
+
   retl <- list(bias_uh_mat=bias_uh_mat,
                tparam_df=tparam_df, n=n, p=p)
   if(!is.null(evdf)){
@@ -469,22 +420,22 @@ gen_sim_gds <- function(gds,pve,bias=0,nreps=1,seed=NULL,chunksize=10000,fgeneid
 
 
 read_SNPinfo_ldsc_gwas <- function(gds,zmat,N=NULL){
-  library(tidyr)
   if(is.null(N)){
-    N <- length(seqGetData(gds,"sample.id"))
+    N <- calc_N(gds)
+
     if(LDshrink::is_haplo(gds)){
       N <- N/2
     }
   }
   tdf <- tibble::data_frame(SNP=seqGetData(gds,var.name="annotation/id"),
-                            allele=seqGetData(gds,var.name="allele")) %>% 
-    separate(allele,into = c("A1","A2"),sep = ",") %>% 
-    mutate(N=N,snp_id=1:n())
-  tdf<- as_data_frame(zmat) %>% mutate(snp_id=1:n()) %>% 
-    gather(fgeneid,Z,-snp_id) %>% 
-    inner_join(tdf) %>% 
-    select(SNP,A1,A2,Z,N,fgeneid)
-  return(split(select(tdf,-fgeneid),tdf$fgeneid))  
+                            allele=seqGetData(gds,var.name="allele")) %>%
+    tidyr::separate(allele,into = c("A1","A2"),sep = ",") %>%
+    dplyr::mutate(N=N,snp_id=1:n())
+  tdf<- dplyr::as_data_frame(zmat) %>% dplyr::mutate(snp_id=1:n()) %>%
+    tidyr::gather(fgeneid,Z,-snp_id) %>%
+    dplyr::inner_join(tdf) %>%
+    dplyr::select(SNP,A1,A2,Z,N,fgeneid)
+  return(split(select(tdf,-fgeneid),tdf$fgeneid))
 }
 
 
@@ -492,23 +443,19 @@ read_SNPinfo_ldsc_gwas <- function(gds,zmat,N=NULL){
 
 
 gen_sim_gds_direct_ldsc <- function(Ql,Dl,gds,pve,bias=0,nreps=1,seed=NULL,fgeneid=NULL,gen_quh=F){
-  library(LDshrink)
-  library(readr)
-  library(purrr)
-  library(SeqArray)
   if(!is.null(seed)){
     set.seed(seed)
   }
   p <- sum(lengths(Dl))
   stopifnot(sum(sapply(Ql,nrow))==p)
-  isHaplo <- is_haplo(gds)
-  
-  
-  n <- length(seqGetData(gds,"sample.id"))
+  isHaplo <- LDshrink::is_haplo(gds)
+
+  n <- calc_N(gds)
+
   if(isHaplo){
     n <- n/2
   }
-  sim_l<- transpose(map2(Ql, Dl,gen_sim_direct_evd,
+  sim_l<- purrr::transpose(purr::map2(Ql, Dl,gen_sim_direct_evd,
                          pve = pve, bias = bias, nreps = nreps,
                          n = n, p = p, fgeneid = fgeneid))
   resl <- list()
@@ -518,141 +465,16 @@ gen_sim_gds_direct_ldsc <- function(Ql,Dl,gds,pve,bias=0,nreps=1,seed=NULL,fgene
   resl[["ldsc_df_l"]] <- read_SNPinfo_ldsc_gwas(gds,resl$bias_uhmat,N=resl$n)
   return(resl)
 }
-  
-  
+
+
 gen_sim_gds_ldsc <- function(gds,pve,bias=0,nreps=1,seed=NULL,chunksize=10000,fgeneid=NULL,evdf=NULL){
   library(LDshrink)
   library(readr)
-  
+
   sim_l <- gen_sim_gds(gds,pve=pve,bias=bias,nreps=nreps,seed=seed,chunksize=chunksize,fgeneid=fgeneid)
-  
+
   sim_l[["ldsc_df_l"]] <- read_SNPinfo_ldsc_gwas(gds,sim_l$bias_uh_mat,N=sim_l$n)
   return(sim_l)
 }
 
 
-
-
-gen_sim_list <- function(SNP, pve, bias=0, nreps,seed=NULL){
-  library(dplyr)
-  if(!is.null(seed)){
-    set.seed(seed)
-  }
-  n <- nrow(SNP)
-  p <- ncol(SNP)
-
-  stopifnot(all.equal(colMeans(SNP),rep(0,p),tolerance=1e-5))
-  tparam_df <- gen_tparamdf_norm(pve, bias, nreps, n, p) %>% mutate(fgeneid=as.character(fgeneid))
-  
-  u_mat <- sapply(tparam_df$tsigu, function(sigu, p){rnorm(n = p, mean = 0, sd = sigu)}, p=p)
-  
-  S <- 1/sqrt(n)*(1/apply(SNP, 2, sd))
-  betamat <- u_mat*S
-  vy <- apply(SNP%*%betamat, 2, var)
-  residvec <- gen_ti(vy, tparam_df$tpve)
-  residmat <- sapply(residvec, function(ti, n){rnorm(n=n, mean=0, sd=sqrt(ti))}, n=n)
-  ymat <- scale(SNP%*%betamat+residmat, center=T, scale=F)
-  betahat_mat <- RSSReQTL::map_beta_exp(SNP, ymat)
-  colnames(betahat_mat) <- as.character(tparam_df$fgeneid)
-  se_mat <- RSSReQTL::map_se_exp(SNP, ymat, betahat_mat)
-  colnames(se_mat) <- as.character(tparam_df$fgeneid)
-  
-  bias_mat <- sapply(tparam_df$tbias, function(ta, p){rnorm(n=p, mean=0, sd=sqrt(ta))}, p=p)
-  colnames(bias_mat) <- as.character(tparam_df$fgeneid)
-  uh_mat <- betahat_mat/se_mat
-  colnames(uh_mat) <- as.character(tparam_df$fgeneid)
-  #  u_mat <- betamat/se_mat
-  bias_uh_mat <- uh_mat+bias_mat
-  colnames(bias_uh_mat) <- as.character(tparam_df$fgeneid)
-  
-
-
-  retl <- list(bias_uh_mat=bias_uh_mat,
-               tparam_df=tparam_df, n=n, p=p)
-  
-  return(retl)
-}
-
-gen_sim <- function(SNP, pve, bias=0, nreps, outdir, collapse_all=T, overwrite=F,debug=F){
-  library(dplyr)
-  n <- nrow(SNP)
-  p <- ncol(SNP)
-  if(!dir.exists(outdir)){
-    dir.create(outdir)
-  }
-  stopifnot(all.equal(colMeans(SNP),rep(0,p),tolerance=1e-5))
-  tparam_df <- gen_tparamdf_norm(pve, bias, nreps, n, p)
-  
-  u_mat <- sapply(tparam_df$tsigu, function(sigu, p){rnorm(n = p, mean = 0, sd = sigu)}, p=p)
-  
-  S <- 1/sqrt(n)*(1/apply(SNP, 2, sd))
-  betamat <- u_mat*S
-  vy <- apply(SNP%*%betamat, 2, var)
-  residvec <- gen_ti(vy, tparam_df$tpve)
-  residmat <- sapply(residvec, function(ti, n){rnorm(n=n, mean=0, sd=sqrt(ti))}, n=n)
-  ymat <- scale(SNP%*%betamat+residmat, center=T, scale=F)
-  betahat_mat <- RSSReQTL::map_beta_exp(SNP, ymat)
-  colnames(betahat_mat) <- as.character(tparam_df$fgeneid)
-  se_mat <- RSSReQTL::map_se_exp(SNP, ymat, betahat_mat)
-  colnames(se_mat) <- as.character(tparam_df$fgeneid)
-  
-  bias_mat <- sapply(tparam_df$tbias, function(ta, p){rnorm(n=p, mean=0, sd=sqrt(ta))}, p=p)
-  colnames(bias_mat) <- as.character(tparam_df$fgeneid)
-  uh_mat <- betahat_mat/se_mat
-  colnames(uh_mat) <- as.character(tparam_df$fgeneid)
-  #  u_mat <- betamat/se_mat
-  bias_uh_mat <- uh_mat+bias_mat
-  colnames(bias_uh_mat) <- as.character(tparam_df$fgeneid)
-  
-  if(!collapse_all){
-    if(debug){
-      saveRDS(betamat, file.path(outdir, "betamat.RDS"))
-      saveRDS(residvec, file.path(outdir, "residvec.RDS"))
-      saveRDS(residmat, file.path(outdir, "residmat.RDS"))
-      saveRDS(ymat, file.path(outdir, "ymat.RDS"))
-      saveRDS(betahat, file.path(outdir, "betahat_mat.RDS"))
-      saveRDS(se_mat, file.path(outdir, "se_mat.RDS"))
-      saveRDS(bias_mat, file.path(outdir, "bias_mat.RDS"))
-      saveRDS(u_mat, file.path(outdir, "u_mat.RDS"))
-      saveRDS(uh_mat, file.path(outdir, "uh_mat.RDS"))
-    }
-    saveRDS(bias_uh_mat, file.path(outdir, "bias_uh_mat.RDS"))
-    saveRDS(tparam_df, file.path(outdir, "tparam_df.RDS"))
-  }else{
-    outfilep <- file.path(outdir, "simulation.RDS")
-    i <- 0
-    if(!overwrite){
-      while(file.exists(outfilep)){
-        i <- i+1
-        outfilep <- file.path(outdir, paste0("simulation", i, ".RDS"))
-      }
-    }
-    if(debug){
-      retl <- list(betamat=betamat,
-                   residsd=residvec,
-                   residmat=residmat,
-                   ymat=ymat,
-                   betahat=betahat_mat,
-                   se_mat=se_mat,
-                   bias_mat=bias_mat,
-                   u_mat=u_mat,
-                   uh_mat=uh_mat,
-                   bias_uh_mat=bias_uh_mat,
-                   tparam_df=tparam_df, n=n, p=p)
-      retl[["md5"]] <- PKI::PKI.digest(as.raw(retl[["bias_uh_mat"]]))
-      saveRDS(retl, file = outfilep)
-    }else{
-      retl <- list(bias_uh_mat=bias_uh_mat,
-                   tparam_df=tparam_df, n=n, p=p)
-      retl[["md5"]] <- PKI::PKI.digest(as.raw(retl[["bias_uh_mat"]]))
-      saveRDS(retl, file = outfilep)
-    }
-    return(outfilep)
-  }
-}
-
-# gen_sim_ldsc <- function(df,tpve=0.56,){
-#   
-#   
-#   
-# }
