@@ -12,32 +12,39 @@ genogdsf <- file.path(rssp_dir,"sub_19_geno.gds")
 test_that("We can estimate parameters",{
   
 
-  
+  #genogds is the SeqArray file with the data stored as genotypes (it's used here for GWAS simulation)
   genogds <- SeqArray::seqOpen(genogdsf)
+  #haplogds is the SeqArray file with the data stored as haplotypes (it's used to calculate LD, which is used by RSSp)
   haplogds <- SeqArray::seqOpen(haplogdsf)
   
   
-  # data("shrink_R")
-  # data("cohort_SNP")
-  library(LDshrink)
+  #pve is bounded between 0 and 1 
   pve <- as.numeric(seq(0.7,0.9,length.out = 10))
+  #bias is also bounded between 0 and 1
   bias <- as.numeric(seq(0.0,0.1,length.out = 2))
+  #each pve-bias combination is simulated 3 times
   nreps <- 3
   
+  #count the number of SNPs
   p <- calc_p(genogds)
+  #count the number of individuals
   n <- calc_N(genogds)
-  chunksize <- p/1
-  # SNP <- cohort_SNP
-  # temp_dir <- tempdir()
-  msim <- gen_sim_gds(gds,pve=pve,bias=bias,nreps=nreps)
+
+  #gen_sim_gds simulates GWAS summary stats.
+  msim <- gen_sim_gds(genogds,pve=pve,bias=bias,nreps=nreps)
+  
+  #Use LDshrink to calculate R
   R <- LDshrink::calc_LD_gds(haplogds)
+  #use base R to perform EVD 
   evdR <- eigen(R)
+  #est_sim is a helper function for estimating parameters from simulations. 
+  # instead of taking a single matrix of eigenvectors, it takes a list, with each element representing each LD block
   Ql <- list("1"=evdR$vectors)
   D <- evdR$values
   
  res <- est_sim(resl = msim,Ql = Ql,D = D,doConfound = T) %>% select(-log_params,-useGradient)
  expect_true(all(res$pve<=1))
- expect_true(all(res$a_hat>=0))
+ expect_true(all(res$bias>=0))
  expect_equal(res$sigu,res$tsigu,tolerance=0.1)
  
 })
@@ -119,7 +126,7 @@ test_that("We can estimate parameters with direct simulations really well when u
   tparam_df <- gen_tparamdf_norm(pve,bias,nreps,n,p)
   diag_sim <- sim_quh_dir(tsigu = tparam_df$tsigu[1],tbias = tparam_df$tbias[1],Q = evdR$vectors,D = evdR$values,fgeneid = tparam_df$fgeneid,snp_id = 1:p)
   rss_res <- RSSp_run_mat_quh(quh_mat_d = diag_sim$quh,D=diag_sim$D,n = n) %>% inner_join(tparam_df)
-  expect_equal(rss_res$sigu,rss_res$tsigu,tolerance=0.2)
+  expect_equal(rss_res$sigu,rss_res$tsigu,tolerance=0.3)
 })
 
 test_that("We can estimate parameters with direct simulations really well without using the identity",{
@@ -169,6 +176,14 @@ test_that("We can estimate parameters with direct simulations really well withou
 
 
 test_that("My gradient is the same as the stan gradient",{
+  
+  {
+    
+    mx <- 3
+    mx+2
+  }
+  
+  
   
   tparam <- runif(2)
   dvec <- runif(5)

@@ -156,8 +156,7 @@ est_sim <- function(resl,Ql=NULL,D=NULL,doConfound=T,log_params=F,useGradient=T,
   if(is.null(resl$quh_mat)){
     resl$quh_mat <- quh_mat(Ql,resl$bias_uh_mat)
   }
-  p_n <- resl$p/resl$n
-  sigu_bounds <- calc_sigu(pve_bounds,p_n)
+
   
   rss_res <- purrr::cross(list(doConfound=doConfound,log_params=log_params,useGradient=useGradient)) %>%
     purrr::invoke_map_dfr(
@@ -167,7 +166,7 @@ est_sim <- function(resl,Ql=NULL,D=NULL,doConfound=T,log_params=F,useGradient=T,
       D=D,
       n=resl$n,
       a_bounds=bias_bounds,
-      sigu_bounds=sigu_bounds) %>% dplyr::inner_join(resl$tparam_df)
+      pve_bounds=pve_bounds) %>% dplyr::inner_join(resl$tparam_df)
   return(rss_res)
 }
 

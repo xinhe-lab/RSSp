@@ -87,11 +87,13 @@ RSSp <- function(fgeneid=NULL,D,quh,sigu_bounds=c(1e-7,2.6),a_bounds=c(0,1),p_n,
 
 
 
-RSSp_run_mat_quh <- function(quh_mat_d,D,n,sigu_bounds=c(1e-07,2.6),a_bounds=c(0,1),doConfound=T,log_params=F,useGradient=T){
+RSSp_run_mat_quh <- function(quh_mat_d,D,n,pve_bounds=c(1e-07,1),a_bounds=c(0,1),doConfound=T,log_params=F,useGradient=T){
+  
   fgeneids <- colnames(quh_mat_d)
   stopifnot(nrow(quh_mat_d)==length(D))
   p <- length(D)
   p_n <- p/n
+  sigu_bounds <- calc_sigu(pve_bounds,p_n)
   quhl <- purrr::array_branch(quh_mat_d,2)
   names(quhl) <- fgeneids
   return(purrr::imap_dfr(
@@ -105,7 +107,8 @@ RSSp_run_mat_quh <- function(quh_mat_d,D,n,sigu_bounds=c(1e-07,2.6),a_bounds=c(0
         doConfound=doConfound,
         log_params=log_params,
         useGradient=useGradient,
-        a_bounds=a_bounds,sigu_bounds=sigu_bounds
+        a_bounds=a_bounds,
+        sigu_bounds=sigu_bounds
       )
     },
     D=D,
@@ -190,7 +193,7 @@ RSSp_estimate <- function(data_df,sigu_bounds= c(1e-7,2.6),a_bounds=c(0,1),p_n,d
     }
   }
 
-  return(tibble::data_frame(sigu=siguv,a_hat=av,lnZ=lnzv,
+  return(tibble::data_frame(sigu=siguv,bias=av,lnZ=lnzv,
                     convergence=conv,
                     message=convm,
                     fgeneid=as.character(unique(data_df[["fgeneid"]])),
