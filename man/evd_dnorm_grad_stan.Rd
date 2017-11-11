@@ -7,14 +7,14 @@
 evd_dnorm_grad_stan(par, dvec, quh)
 }
 \arguments{
-\item{quh}{The precomputed matrix vector product Q%*%u_hat (passed as a vector)}
+\item{par}{a length 2 numeric vector.  `par[1]` corresponds to the sigma_u^2 parameter, and `par[2]` corresponds to the confounding parameter. 
+If the model does not include confounding, `par` can be a length one vector.}
 
-\item{dvec.}{The eigenvalues of the LD matrix}
+\item{quh}{The precomputed matrix vector product `crossprod(Q,u_hat)` (passed as a  length `p` vector)}
+
+\item{dvec.}{The eigenvalues of the LD matrix, passed as a length `p` vector}
 }
 \description{
 This is an attempt to use stan's AD features to calculate a gradient 
 for the RSSp likelihood
-}
-\details{
-//' @param par a length 2 numeric vector.  par[1] corresponds to the sigma_u parameter, and par[2] corresponds to the confounding parameter
 }
