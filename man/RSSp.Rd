@@ -14,8 +14,6 @@ RSSp(fgeneid = NULL, D, quh, sigu_bounds = c(1e-07, 2.6), a_bounds = c(0,
 \arguments{
 \item{fgeneid}{a character vector specifying the name of the traits being analyzed}
 
-\item{D}{A vector of length `p` indicating the eigenvalues obtained from an EVD of the LD matrix.}
-
 \item{quh}{a `p` by `ntrait` matrix with transformed, standardized effect sizes obtained from running `prep_RSSp`
 (If only one trait is being analyzed, `quh` can also be a length `p` vector)}
 

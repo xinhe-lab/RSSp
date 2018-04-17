@@ -2,36 +2,36 @@ context("Checking Simulated Data")
 
 
 
-test_that("We can estimate parameters",{
-  
-    data("simulation_tparam_df")
-    data("simulation_R")
-    data("simulation_uh_mat")
-    
-                                        #Use LDshrink to calculate R
-
-                                        #use base R to perform EVD 
-    evdR <- eigen(simulation_R)
-                                        #est_sim is a helper function for estimating parameters from simulations. 
-                                        # instead of taking a single matrix of eigenvectors, it takes a list, with each element representing each LD block
-
-    D <- evdR$values
-    n <- unique(simulation_tparam_df$n)
-    p <- unique(simulation_tparam_df$p)
-    
-    quh_mat <- crossprod(evdR$vectors,simulation_uh_mat)
-    colnames(quh_mat) <- colnames(simulation_uh_mat)
-    
-    res <- RSSp_run_mat_quh(quh_mat = quh_mat, D = D,n = n,doConfound = T) %>% dplyr::inner_join(simulation_tparam_df)
-
-    
-    expect_true(all(res$pve<=1))
-    expect_true(all(res$bias>=0))
-    expect_equal(res$sigu,res$tsigu,tolerance=0.1)
-
-})
-
-
+# test_that("We can estimate parameters",{
+#   
+#     data("simulation_tparam_df")
+#     data("simulation_R")
+#     data("simulation_uh_mat")
+#     
+#                                         #Use LDshrink to calculate R
+# 
+#                                         #use base R to perform EVD 
+#     evdR <- eigen(simulation_R)
+#                                         #est_sim is a helper function for estimating parameters from simulations. 
+#                                         # instead of taking a single matrix of eigenvectors, it takes a list, with each element representing each LD block
+# 
+#     D <- evdR$values
+#     n <- unique(simulation_tparam_df$n)
+#     p <- unique(simulation_tparam_df$p)
+#     
+#     quh_mat <- crossprod(evdR$vectors,simulation_uh_mat)
+#     colnames(quh_mat) <- colnames(simulation_uh_mat)
+#     
+#     # res <- RSSp_run_mat_quh(quh_mat = quh_mat, D = D,n = n,doConfound = T) %>% dplyr::inner_join(simulation_tparam_df)
+# 
+#     
+#     expect_true(all(res$pve<=1))
+#     expect_true(all(res$bias>=0))
+#     expect_equal(res$sigu,res$tsigu,tolerance=0.1)
+# 
+# })
+# 
+# 
 
 
 
@@ -70,7 +70,7 @@ test_that("Multivariate density is computed correctly without bias",{
   rdat <- c(mvtnorm::rmvnorm(n=1,mean=rep(0,p),sigma=tcov))
   qrdat <- c(crossprod(Revd$vectors,rdat))
   R_dens <- mvtnorm::dmvnorm(x = rdat,mean = rep(0,p),sigma = tcov,log = T)
-  cpp_dens <- evd_dnorm(c(sigu,bias),dvec=Revd$values,quh = qrdat)-0.5*p*log(2*pi)
+  cpp_dens <- evd_dnorm(c(sigu^2,bias),dvec=Revd$values,quh = qrdat)-0.5*p*log(2*pi)
   expect_equal(cpp_dens,R_dens)
 })
 
@@ -175,7 +175,53 @@ test_that("My hessian is the same as the stan gradient",{
 })
 
 
+test_that(" Both ways of computing the hessian work",{
+  tparam <- runif(2)
+  # ttparam <- tparam
+  # ttparam[2] <- prod(tparam)
+  dvec <- runif(5)
+  quh <- rnorm(5)
+  Rh <- RSSp_hess(par = tparam,dvec = dvec,quh = quh)
+  
+  
+  
+  
+  t_hess <- function(par,dvec,quh){
+    s <- par[1]
+    a <- ifelse(length(par)==2,par[2],0)
+    Hmat <- matrix(0,2,2)
+ 
+    Hmat[1,1] <- sum((dvec^4 *(a + dvec + dvec^2*s - 2*quh^2))/(2*(a + dvec + dvec^2*s)^3))
+    Hmat[1,2]  <-sum((dvec^2 *(a + dvec + dvec^2*s - 2*quh^2))/(2*(a + dvec + dvec^2*s)^3))
+    Hmat[2,1] <- Hmat[1,2]
+    Hmat[2,2] <- sum((a+dvec^2*s+dvec-2*quh^2)/(2*(a+dvec^2*s+dvec)^3))
+    return(Hmat)
+  }
 
+  t_H <- t_hess(par=tparam,dvec=dvec,quh=quh)
+  expect_equal(t_H,Rh)
+  
+  
+  
+})
+
+
+
+
+# test_that(" Both ways of inverting the Hessian work",{
+#   tparam <- runif(2)
+#   # ttparam <- tparam
+#   # ttparam[2] <- prod(tparam)
+#   dvec <- runif(5)
+#   quh <- rnorm(5)
+#   Rh <- RSSp_hess(par = tparam,dvec = dvec,quh = quh)
+#   Rhi <- solve(Rh)
+#   rrHi <- RSSp_hessi(par = tparam,dvec = dvec,quh = quh)
+#   expect_equal(rrHi,Rhi)
+#   
+#   
+#   
+# })
 
 
 

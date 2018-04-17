@@ -145,6 +145,22 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// posterior_var_Beta
+Eigen::MatrixXd posterior_var_Beta(const MapA sigu, const MapA confound, const MapA dvec, const MapMat quh, const MapMat Q, const MapMat se);
+RcppExport SEXP _RSSp_posterior_var_Beta(SEXP siguSEXP, SEXP confoundSEXP, SEXP dvecSEXP, SEXP quhSEXP, SEXP QSEXP, SEXP seSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const MapA >::type sigu(siguSEXP);
+    Rcpp::traits::input_parameter< const MapA >::type confound(confoundSEXP);
+    Rcpp::traits::input_parameter< const MapA >::type dvec(dvecSEXP);
+    Rcpp::traits::input_parameter< const MapMat >::type quh(quhSEXP);
+    Rcpp::traits::input_parameter< const MapMat >::type Q(QSEXP);
+    Rcpp::traits::input_parameter< const MapMat >::type se(seSEXP);
+    rcpp_result_gen = Rcpp::wrap(posterior_var_Beta(sigu, confound, dvec, quh, Q, se));
+    return rcpp_result_gen;
+END_RCPP
+}
 // simuh_dir_cpp
 Eigen::MatrixXd simuh_dir_cpp(double sigu, double bias, int nreps, Eigen::MatrixXd& Q, Eigen::ArrayXd& D, Rcpp::StringVector fgeneids, Eigen::MatrixXd usim);
 RcppExport SEXP _RSSp_simuh_dir_cpp(SEXP siguSEXP, SEXP biasSEXP, SEXP nrepsSEXP, SEXP QSEXP, SEXP DSEXP, SEXP fgeneidsSEXP, SEXP usimSEXP) {
@@ -230,6 +246,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_RSSp_posterior_mean_U", (DL_FUNC) &_RSSp_posterior_mean_U, 5},
     {"_RSSp_posterior_mean_Beta", (DL_FUNC) &_RSSp_posterior_mean_Beta, 6},
     {"_RSSp_posterior_mean_Y", (DL_FUNC) &_RSSp_posterior_mean_Y, 7},
+    {"_RSSp_posterior_var_Beta", (DL_FUNC) &_RSSp_posterior_var_Beta, 6},
     {"_RSSp_simuh_dir_cpp", (DL_FUNC) &_RSSp_simuh_dir_cpp, 7},
     {"_RSSp_block_mat_mul", (DL_FUNC) &_RSSp_block_mat_mul, 3},
     {"_RSSp_rcppeigen_hello_world", (DL_FUNC) &_RSSp_rcppeigen_hello_world, 0},

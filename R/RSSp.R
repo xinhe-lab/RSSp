@@ -22,47 +22,95 @@ RSSp_evd_mvd_prec <- function(par,dvec,quh){
 }
 
 
+filter_pvv <- function(D_df,pvv=1,add_region_id=F){
+    stopifnot(!is.null(D_df$D))
+
+    if(is.null(D_df$region_id)){
+        if(add_region_id){
+            D_df <- dplyr::mutate(D_df,region_id=1)
+        }else{
+            stop("column `region_id` missing from D_df, (use `add_region_id=TRUE` to use only one block)")
+        }
+    }
+    stopifnot(!is.null(D_df$region_id))
+    dplyr::group_by(D_df,region_id) %>%
+    dplyr::mutate(rel_D=D/sum(D),cumsum_D=cumsum(rel_D)) %>%
+    dplyr::filter(cumsum_D<=max(c(pvv,min(cumsum_D)))) %>%
+    dplyr::ungroup() %>%return()
+}
+
+
+
 
 RSSp_hess <- function(par,dvec,quh){
-  s <- par[1]  
+  s <- par[1]
   a <- ifelse(length(par)==2,par[2],0)
   Hmat <- matrix(0,2,2)
+  pmult <- (a+dvec^2*s+dvec-2*quh^2)/(2*(a+dvec^2*s+dvec)^3)
   
   
-  Hmat[1,1] <- sum((dvec^4 *(a + dvec + dvec^2*s - 2*quh^2))/(2*(a + dvec + dvec^2*s)^3))
-  Hmat[1,2]  <-sum((dvec^2 *(a + dvec + dvec^2*s - 2*quh^2))/(2*(a + dvec + dvec^2*s)^3))
+  Hmat[1,1] <- sum(pmult*dvec^4)
+  Hmat[1,2]  <-sum(pmult*dvec^2)
   Hmat[2,1] <- Hmat[1,2]
-  Hmat[2,2] <- sum((a+dvec^2*s+dvec-2*quh^2)/(2*(a+dvec^2*s+dvec)^3))
+  Hmat[2,2] <- sum(pmult)
   return(Hmat)
+}
+
+RSSp_hessi <-function(par,dvec,quh){
+  s <- par[1]
+  a <- ifelse(length(par)==2,par[2],0)
+ 
+  Hmati <- matrix(0,2,2)
+  
+  
+  
+  pmult <- (2*(a+dvec^2*s+dvec)^3)/(a+dvec^2*s+dvec-2*quh^2)
+  
+  
+  Hmati[1,1] <- sum(pmult*dvec^4)
+  Hmati[1,2]  <-sum(pmult*dvec^2)
+  Hmati[2,1] <- Hmati[1,2]
+  Hmati[2,2] <- sum(pmult)
+
+  return(Hmati)
 }
 
 
 
 #' Estimate the quantile of the maximum likelihood estimate
 
-RSSp_cov <- function(par0,dvec,quh,perc=0.95){
-
-  stopifnot(length(dvec)==length(quh))
-  Imat <- 1/(RSSp_hess(par = par0,dvec = dvec,quh = quh))
-  return(mvtnorm::qmvnorm(p = perc,mean = par0,sigma = Imat,tail = "both")$quantile)
-}
+# RSSp_cov <- function(par0,dvec,quh,perc=0.95){
+#
+#   stopifnot(length(dvec)==length(quh))
+#   Imat <- 1/(RSSp_hess(par = par0,dvec = dvec,quh = quh))
+#   return(mvtnorm::qmvnorm(p = perc,mean = par0,sigma = Imat,tail = "both")$quantile)
+# }
 
 #' Title
 #'
-#' @param par 
-#' @param dvec 
-#' @param quh 
+#' @param par
+#' @param dvec
+#' @param quh
 #'
 #' @return
 #' @export
 #'
 #' @examples
-RSSp_cov_nc <- function(par,dvec,quh){
-  p <- length(dvec)
-  stopifnot(length(dvec)==length(quh))
-  grad2 <- RSSp_hess(par = par,dvec = dvec,quh = quh)[1,1]
-  Imat <- 1/(p*grad2)
-  return(Imat)
+RSSp_information_nc <- function(par,dvec){
+  var <- par[1]
+  return(matrix(0.5*sum(dvec^4/(var*dvec^2+dvec)^2),1,1))
+}
+
+RSSp_information <- function(par,dvec){
+  var <- par[1]
+  a <- ifelse(length(par)==2,par[2],0)
+  Im <- matrix(0,2,2)
+  Im[1,1] <- 0.5*sum(dvec^4/(var*dvec^2+dvec+a)^2)
+  Im[2,2] <- 0.5*sum(1/(var*dvec^2+dvec+a)^2)
+  Im[1,2] <- 0.5*sum(dvec^2/(var*dvec^2+dvec+a)^2)
+  Im[2,1] <- Im[1,2]
+  return(Im)
+  
 }
 
 
@@ -116,7 +164,7 @@ prep_RSSp <- function(Rl,U,N){
 #' Run RSSp on one or several traits
 #'
 #' @param fgeneid a character vector specifying the name of the traits being analyzed
-#' @param D A vector of length `p` indicating the eigenvalues obtained from an EVD of the LD matrix.
+#' @param 
 #' @param quh a `p` by `ntrait` matrix with transformed, standardized effect sizes obtained from running `prep_RSSp`
 #'  (If only one trait is being analyzed, `quh` can also be a length `p` vector)
 #' @param doConfound a logical indicating whether to use the two parameter model (`doConfound=T`) or the one parameter model without confounding
@@ -244,9 +292,65 @@ RSSp_prec <- function(quh,dvec,fgeneid=NULL,prec_bounds=c(1e-1,1e7),confound_bou
                               pve=p_n*sigu^2)
   return(retdf)
 }
+RSSp_estimate_grid <- function(data_df,sigu_bounds=NULL,bias_bounds=c(0,1),grid_points=10){
+  fgeneid <- unique(data_df$fgeneid)
+  stopifnot(length(fgeneid)==1)
+  
+  stopifnot(length(bias_bounds)==2)
+  p_n <- unique(data_df$p_n)
+  stopifnot(length(p_n)==1)
+  if(is.null(sigu_bounds)){
+    sigu_bounds <- calc_sigu(c(.Machine$double.eps,1-.Machine$double.eps),p_n)
+  }
+  stopifnot(length(sigu_bounds)==2)
+  varu_bounds <- sigu_bounds^2
+  fnf <- RSSp_evd_mvd
 
-RSSp_estimate <- function(data_df,sigu_bounds= NULL,a_bounds=c(0,1),p_n=NULL,doConfound=T,log_params=F,useGradient=T){
+  stopifnot(!anyNA(sigu_bounds))
+  stopifnot(!anyNA(varu_bounds))
+  stopifnot(!anyNA(bias_bounds))
+  v_seq <- unique(seq(varu_bounds[1],varu_bounds[2],length.out = grid_points))
+  cf_seq <- unique(seq(bias_bounds[1],bias_bounds[2],length.out = grid_points))
+  ret_df <- purrr::cross2(v_seq,cf_seq) %>% 
+    purrr::map(purrr::as_vector) %>% 
+    map_df(~data_frame(varu=.x[1],bias=.x[2],lnZ=evd_dnorm(par=.x,dvec=data_df$D,quh=data_df$quh))) %>% 
+             dplyr::mutate(fgeneid=fgeneid,pve=calc_pve(sqrt(varu),p_n))
+  return(ret_df)
+}
 
+
+
+RSSp_mom <- function(data_df,p_n=NULL,doConfound=F){
+  if(!doConfound){
+    tlm <- lm(I(quh^2)~I(D^2)+offset(D)+0,data=data_df)
+  }else{
+    tlm <- lm(I(quh^2)~I(D^2)+offset(D)+0,data=data_df)
+  }
+  if(!is.null(data_df$p_n)){
+    p_n <- unique(data_df$p_n)
+  }
+  stopifnot(length(p_n)==1)
+  sigu <- sqrt(coef(tlm)[1])
+  varu <- sigu^2
+  av <- ifelse(doConfound,tlm[2],0)
+  lnZ <- RSSp_evd_mvd(par = c(varu,av),dvec = data_df$D,quh = data_df$quh)
+  retdf <- tibble::data_frame(sigu=sigu,bias=av,lnZ=lnZ,
+                              fgeneid=as.character(data_df[["fgeneid"]][1]),
+                              log_params=F,
+                              method=ifelse(doConfound,"Confound","NoConfound"),
+                              optim=F,
+                              pve=p_n*varu)
+              
+}
+
+RSSp_estimate <- function(data_df,sigu_bounds= NULL,a_bounds=c(0,1),p_n=NULL,doConfound=T,calc_H=T,calc_var=T){
+  truncate_data <- T
+  useGradient=T
+  log_params <- F
+  if(truncate_data){
+    data_df <- dplyr::filter(data_df,D>2*.Machine$double.eps)
+  }
+  stopifnot(all(data_df$D>0))
   stopifnot(length(unique(data_df$fgeneid))==1)
   stopifnot(length(a_bounds)==2)
   if(!is.null(data_df$p_n)){
@@ -271,7 +375,7 @@ RSSp_estimate <- function(data_df,sigu_bounds= NULL,a_bounds=c(0,1),p_n=NULL,doC
       optim_method <- "Brent"
     }
   }
-  
+
   if(log_params){
     fnf <- RSSp_evd_lmvd
     sigu_bounds <- log(sigu_bounds)
@@ -297,7 +401,7 @@ RSSp_estimate <- function(data_df,sigu_bounds= NULL,a_bounds=c(0,1),p_n=NULL,doC
   quh <- data_df$quh
   stopifnot(!is.null(dvec),
             !is.null(quh))
-  ldat  <- stats::optim(par=par0,fn=fnf,gr=grf,lower=minb,upper=maxb,dvec=dvec,quh=quh,method=optim_method)
+  ldat  <- stats::optim(par=par0,fn=fnf,gr=grf,lower=minb,upper=maxb,dvec=dvec,quh=quh,method=optim_method,hessian=calc_H)
   par_ret <- ldat$par
   if(log_params){
     par_ret <- exp(par_ret)
@@ -312,26 +416,69 @@ RSSp_estimate <- function(data_df,sigu_bounds= NULL,a_bounds=c(0,1),p_n=NULL,doC
   if(is.null(convm)){
     convm <- "Converged"
   }
-    
-  Hmat <- 1/(-RSSp_hess(par=c(varuv,av),dvec = dvec,quh = quh))
-  
+
+
+
+
   retdf <- tibble::data_frame(sigu=siguv,bias=av,lnZ=lnzv,
                               convergence=conv,
-                              sigu_var=Hmat[1,1],
-                              bias_var=Hmat[2,2],
-                              sigu_bias_cov=Hmat[1,2],
                               message=convm,
                               fgeneid=as.character(data_df[["fgeneid"]][1]),
                               log_params=log_params,
                               useGradient=useGradient,
+                              optim=T,
                               method=ifelse(doConfound,"Confound","NoConfound"),
                               pve=p_n*sigu^2)
+  
+  if(calc_H){
+    Hmat <- ldat$hessian
+    if(doConfound){
+      Hvar <- purrr::possibly(solve,otherwise = matrix(NA_real_,2,2))(Hmat)/sqrt(length(dvec))
+      sigu_var_h <- Hvar[1,1]
+      bias_var_h <- Hvar[2,2]
+      sigu_bias_cov_h <- Hvar[1,2]
+    }else{
+      Hvar <- (1/(Hmat))/sqrt(length(dvec))
+      sigu_var_h <- Hvar[1,1]
+      bias_var_h <- 0
+      sigu_bias_cov_h <- 0
+    }
+    H_det <- det(Hmat)
+    retdf <- dplyr::mutate(retdf,
+                           sigu_var_h=sigu_var_h,
+                           bias_var_h=bias_var_h,
+                           sigu_bias_cov_h=sigu_bias_cov_h,
+                           H_det=H_det)
+  }
+    if(calc_var){
+      if(doConfound){
+        Imat <- RSSp_information(par = ldat$par,dvec = dvec)
+        sigu_var <- 1/Imat[1,1]
+        bias_var <- 1/Imat[2,2]
+        sigu_bias_cov <- 1/Imat[1,2]
+      }else{
+        Imat <- RSSp_information_nc(par=ldat$par,dvec=dvec)
+        sigu_var <- 1/Imat[1,1]
+        bias_var <- 0
+        sigu_bias_cov <- 0
+      }
+      Fisher_det <- det(Imat)
+      retdf <- dplyr::mutate(retdf,
+                             sigu_var=sigu_var,
+                             bias_var=bias_var,
+                             sigu_bias_cov=sigu_bias_cov,
+                             fisher_det=Fisher_det)
+  }
+  
+  
+
   retdf <- dplyr::mutate(retdf,
                          sigu_min_bound=sigu_bounds[1],
                          sigu_max_bound=sigu_bounds[2],
                          confound_min_bound=ifelse(doConfound,minb[2],0),
                          confound_max_bound=ifelse(doConfound,maxb[2],0))
-  
+
+
   return(retdf)
 }
 

@@ -69,6 +69,10 @@ posterior_mean_Y <- function(sigu, confound, dvec, quh, Q, se, x) {
     .Call('_RSSp_posterior_mean_Y', PACKAGE = 'RSSp', sigu, confound, dvec, quh, Q, se, x)
 }
 
+posterior_var_Beta <- function(sigu, confound, dvec, quh, Q, se) {
+    .Call('_RSSp_posterior_var_Beta', PACKAGE = 'RSSp', sigu, confound, dvec, quh, Q, se)
+}
+
 simuh_dir_cpp <- function(sigu, bias, nreps, Q, D, fgeneids, usim) {
     .Call('_RSSp_simuh_dir_cpp', PACKAGE = 'RSSp', sigu, bias, nreps, Q, D, fgeneids, usim)
 }

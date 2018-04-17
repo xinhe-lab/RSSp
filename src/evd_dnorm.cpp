@@ -39,10 +39,11 @@ template <> double RSSp_lik<one_parameter_type>(const MapA par, const MapA dvec,
 //[[Rcpp::export]]
 double evd_dnorm(const MapA par,const MapA dvec, const MapA quh){
   const double varu=par(0);
+  const double p=static_cast<double>(dvec.size());
   const double a=(par.size()>1)?par(1):0;
   const double tsum = ((dvec*dvec*varu+dvec+a).log()).sum();
   const double tprod = (quh*(1/(dvec*dvec*varu+dvec+a))*quh).sum();
-  return -0.5*(tsum+tprod);
+  return -0.5*(tsum+tprod)-0.5*p*log(2*M_PI);
 }
 
 
@@ -249,6 +250,25 @@ Eigen::MatrixXd  posterior_mean_Y(const MapA sigu,const MapA confound,const MapA
   Eigen::MatrixXd pD=posterior_mean_D(sigu,confound,dvec);
   return(x*(se.array()*(Q*(pD.array()*quh.array()).matrix()).array()).matrix());
 }
+
+//[[Rcpp::export]]
+Eigen::MatrixXd posterior_var_Beta(const MapA sigu,const MapA confound,const MapA dvec,const MapMat quh,const MapMat Q,const MapMat se){
+  const size_t g=sigu.size();
+  const size_t p=dvec.size();
+  if((Q.rows()!=p)||(Q.cols()!=p)){
+    Rcpp::stop("Eigenvector shape (Q) does not match eigenvalue shape (dvec)");
+  }
+  if(quh.rows()!=p ||(quh.cols()!=g)){
+    Rcpp::stop("quh shape does not match eigenvalue shape (dvec) or sigu shape");
+  }
+  if(se.rows()!=p || se.cols()!=g){
+    Rcpp::stop("se shape does not match eigenvalue shape (dvec) or sigu shape");
+  }
+  
+  Eigen::MatrixXd pD=posterior_mean_D(sigu,confound,dvec);
+  return(se.array()*(Q*(pD.array()*quh.array()).matrix()).array());
+}
+
 
 
 

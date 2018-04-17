@@ -12,16 +12,18 @@ posterior_mean_beta <- function(sigu,confound=0,dvec,se,Q,quh){
   return(se*posterior_mean_u(sigu,confound,dvec,Q,quh))
 }
 
+d_sigma <- function(sigu,confound=0,dvec){
+  # D_\Sigma from https://crerecombinase.github.io/PolygenicRSS/RSSp_Posterior.html
+  return(((dvec+confound)*sigu^2)/((dvec+confound)+dvec^2*sigu^2))
+}
+
 posterior_var_u <- function(sigu,confound=0,dvec,Q){
-  varu <- sigu^2
-  a <- confound
-  # D**^{-1} from https://crerecombinase.github.io/PolygenicRSS/RSSp_Posterior.html
-  pss_Di <- varu*(dvec+a)/(a+dvec*dvec*varu+dvec)
+  pss_Di <- d_sigma(sigu,confound,dvec)
   return(Q%*%diag(pss_Di)%*%t(Q))
 }
 
 posterior_var_beta <- function(sigu,confound=0,dvec,se,Q){
-  return(diag(se)*poster_var_u(sigu,confound,dvec,Q)%*%diag(se))
+  return(diag(se)*posterior_var_u(sigu,confound,dvec,Q)%*%diag(se))
 }
 
 
