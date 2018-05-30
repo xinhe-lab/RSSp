@@ -11,26 +11,26 @@ template<typename T> struct ParamArray{
   typedef typename Eigen::Map<Eigen::Array<double,T::value,1> > ParamType;
 };
 
-
-typedef std::integral_constant<int, 2> two_parameter_type;
-typedef std::integral_constant<int, 1> one_parameter_type;
-
-template <typename T> double RSSp_lik(const MapA par, const MapA dvec, const MapA quh);
-
-template <> double RSSp_lik<two_parameter_type>(const MapA par, const MapA dvec, const MapA quh){
-  const double varu=par(0);
-  const double a=par(1);
-  const double tsum = ((dvec*dvec*varu+dvec+a).log()).sum();
-  const double tprod = (quh*(1/(dvec*dvec*varu+dvec+a))*quh).sum();
-  return -0.5*(tsum+tprod);
-}
-
-template <> double RSSp_lik<one_parameter_type>(const MapA par, const MapA dvec, const MapA quh){
-  const double varu=par(0);
-  const double tsum = ((dvec*dvec*varu+dvec).log()).sum();
-  const double tprod = (quh*(1/(dvec*dvec*varu+dvec))*quh).sum();
-  return -0.5*(tsum+tprod);
-}
+// 
+// typedef std::integral_constant<int, 2> two_parameter_type;
+// typedef std::integral_constant<int, 1> one_parameter_type;
+// 
+// template <typename T> double RSSp_lik(const MapA par, const MapA dvec, const MapA quh);
+// 
+// template <> double RSSp_lik<two_parameter_type>(const MapA par, const MapA dvec, const MapA quh){
+//   const double varu=par(0);
+//   const double a=par(1);
+//   const double tsum = ((dvec*dvec*varu+dvec+a).log()).sum();
+//   const double tprod = (quh*(1/(dvec*dvec*varu+dvec+a))*quh).sum();
+//   return -0.5*(tsum+tprod);
+// }
+// 
+// template <> double RSSp_lik<one_parameter_type>(const MapA par, const MapA dvec, const MapA quh){
+//   const double varu=par(0);
+//   const double tsum = ((dvec*dvec*varu+dvec).log()).sum();
+//   const double tprod = (quh*(1/(dvec*dvec*varu+dvec))*quh).sum();
+//   return -0.5*(tsum+tprod);
+// }
 
 //' RSSp marginalized likelihood function
 //' 

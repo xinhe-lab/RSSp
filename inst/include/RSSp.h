@@ -1,5 +1,8 @@
 #ifndef RSSP_H
 #define RSSP_H
+// #pragma GCC diagnostic ignored "-Wignored-attributes" 
+// #pragma GCC diagnostic ignored "-Wdeprecated-declarations" 
+
 #include <RcppEigen.h>
 typedef Eigen::Map<Eigen::ArrayXd>  MapA;
 typedef Eigen::Map<Eigen::MatrixXd> MapMat;

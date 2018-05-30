@@ -22,9 +22,12 @@ RSSp_evd_mvd_prec <- function(par,dvec,quh){
 }
 
 
-filter_pvv <- function(D_df,pvv=1,add_region_id=F){
-    stopifnot(!is.null(D_df$D))
-
+filter_pvv <- function(D_df,pvv=0,add_region_id=F){
+  if(pvv==0){
+    return(D_df)
+  }
+  stopifnot(!is.null(D_df$D))
+  if(is.null(D_df[["rel_D"]])){
     if(is.null(D_df$region_id)){
         if(add_region_id){
             D_df <- dplyr::mutate(D_df,region_id=1)
@@ -33,12 +36,40 @@ filter_pvv <- function(D_df,pvv=1,add_region_id=F){
         }
     }
     stopifnot(!is.null(D_df$region_id))
-    dplyr::group_by(D_df,region_id) %>%
-    dplyr::mutate(rel_D=D/sum(D),cumsum_D=cumsum(rel_D)) %>%
-    dplyr::filter(cumsum_D<=max(c(pvv,min(cumsum_D)))) %>%
-    dplyr::ungroup() %>%return()
+    D_df <- dplyr::group_by(D_df,region_id) %>% arrange(desc(D)) %>% 
+    dplyr::mutate(rel_D=D/sum(D)) %>% ungroup()
+  }
+  stopifnot(!is.null(D_df[["rel_D"]]))
+  ret_df <- D_df %>% dplyr::filter(rel_D>=pvv) %>%
+    dplyr::ungroup()
+  stopifnot(nrow(ret_df)>0)
+  return(ret_df)
 }
 
+
+
+filter_normD <- function(D_df,normD=0,add_region_id=F){
+  if(pvv==0){
+    return(D_df)
+  }
+  stopifnot(!is.null(D_df$D))
+  if(is.null(D_df[["norm_D"]])){
+    if(is.null(D_df$region_id)){
+      if(add_region_id){
+        D_df <- dplyr::mutate(D_df,region_id=1)
+      }else{
+        stop("column `region_id` missing from D_df, (use `add_region_id=TRUE` to use only one block)")
+      }
+    }
+    stopifnot(!is.null(D_df$region_id))
+    D_df <- dplyr::group_by(D_df,region_id) %>% mutate(norm_D=D/mean(D)) %>% ungroup()
+  }
+  stopifnot(!is.null(D_df[["norm_D"]]))
+  ret_df <- D_df %>% dplyr::filter(norm_D>=norm_D) %>%
+    dplyr::ungroup()
+  stopifnot(nrow(ret_df)>0)
+  return(ret_df)
+}
 
 
 
@@ -161,161 +192,50 @@ prep_RSSp <- function(Rl,U,N){
 
 #' RSSp
 #'
-#' Run RSSp on one or several traits
-#'
-#' @param fgeneid a character vector specifying the name of the traits being analyzed
-#' @param 
-#' @param quh a `p` by `ntrait` matrix with transformed, standardized effect sizes obtained from running `prep_RSSp`
-#'  (If only one trait is being analyzed, `quh` can also be a length `p` vector)
-#' @param doConfound a logical indicating whether to use the two parameter model (`doConfound=T`) or the one parameter model without confounding
-#' @param log_params a logical indicating whether to optimize parameters in log space or not (not recommended)
-#' @param a_bounds a length two vector indicating the bounds of the parameter `a` to use when optimizing, `a` is a measure of confounding
-#' @param sigu_bounds a length two vector indicating bounds in the parameter `sigu` to use when optimizing `sigu` is directly related to PVE
-RSSp <- function(fgeneid=NULL,D,quh,sigu_bounds=c(1e-7,2.6),a_bounds=c(0,1),p_n,doConfound=T,log_params=F,useGradient=T){
+#' Run RSSp on one trait
+
+RSSp <- function(v_hat,
+                 eigenvalues,
+                 p_n,
+                 fgeneid="1",
+                 eigenvalue_cutoff=1e-3,
+                 pve_bounds=c(.Machine$double.eps,1- .Machine$double.eps),
+                 confound_bounds=c(0,0)){
   RSSp_estimate(
     tibble::data_frame(
-      fgeneid=fgeneid,D=D,quh=quh
+      fgeneid=fgeneid,D=eigenvalues,quh=v_hat,p_n=p_n
     ),
-    sigu_bounds=sigu_bounds,a_bounds=a_bounds,
-    p_n=p_n,doConfound = doConfound,
-    log_params=log_params,
-    useGradient=useGradient
+    pve_bounds=pve_bounds,a_bounds=confound_bounds,
+    p_n=p_n,eigenvalue_cutoff = eigenvalue_cutoff,
+    doConfound = any(confound_bounds!=0)
     )
 }
 
 
 
-RSSp_run_mat_quh <- function(quh_mat,D,n,pve_bounds=c(1e-07,1),a_bounds=c(0,1),doConfound=T,log_params=F,useGradient=T){
-
-  fgeneids <- colnames(quh_mat)
-  stopifnot(nrow(quh_mat)==length(D))
-  p <- length(D)
-  stopifnot(length(unique(n))==1)
-  p_n <- p/n
-  sigu_bounds <- calc_sigu(pve_bounds,p_n)
-  quhl <- purrr::array_branch(quh_mat,2)
-  names(quhl) <- fgeneids
-  return(purrr::imap_dfr(
-    quhl,
-    function(quh,fgeneid,D,p_n){
-      RSSp(
-        fgeneid = fgeneid,
-        D = D,
-        quh = quh,
-        p_n = p_n,
-        doConfound=doConfound,
-        log_params=log_params,
-        useGradient=useGradient,
-        a_bounds=a_bounds,
-        sigu_bounds=sigu_bounds
-      )
-    },
-    D=D,
-    p_n=p/n
-  )
-  )
-}
-
-
-RSSp_prec <- function(quh,dvec,fgeneid=NULL,prec_bounds=c(1e-1,1e7),confound_bounds=c(0,1),p_n=NULL,doConfound=T,log_params=F){
-  if(is.null(fgeneid)){
-    fgeneid <- paste0(as.character(as.integer(Sys.time())))
-  }
-  not_null <- compose(`!`, is.null)
-  stopifnot(not_null(p_n),
-            length(p_n)==1,
-            not_null(quh),
-            not_null(dvec),
-            length(quh)==length(dvec))
-  if(log_params){
-    prec_bounds <- log(prec_bounds)
-    confound_bounds <- log(confound_bounds+.Machine$double.eps)
-  }
-  stopifnot(!anyNA(prec_bounds),
-            !anyNA(confound_bounds),
-            !is.unsorted(prec_bounds),
-            !is.unsorted(confound_bounds))
-  minb <- c(prec_bounds[1],
-            confound_bounds[1])
-  maxb <- c(prec_bounds[2],
-            confound_bounds[2])
-
-  par0 <- stats::runif(2,min=minb,max = maxb)
-  stopifnot(!anyNA(par0))
-  if(log_params){
-    if(!doConfound){
-      ldat  <- stats::optimise(f=RSSp_evd_lmvd_prec,interval=prec_bounds,dvec=dvec,quh=quh,tol=sqrt(.Machine$double.eps))
-      siguv <- 1/exp(ldat$minimum)
-      av <- 0
-      lnzv <- ldat$objective
-      conv <-0
-      convm <- "Converged"
-    }else{
-      ldat <- stats::optim(par0,fn=RSSp_evd_lmvd_prec,dvec=dvec,quh=quh)
-      siguv <- 1/exp(ldat$par[1])
-      av <- exp(ldat$par[2])
-      lnzv <- ldat$value
-
-      conv <- ldat$convergence
-      convm <- ldat$message
-      if(is.null(convm)){
-        convm <- "Converged"
-      }
-    }
-  }else{
-    if(!doConfound){
-      ldat  <- stats::optimise(f=RSSp_evd_mvd_prec,interval=prec_bounds,dvec=dvec,quh=quh,tol = .Machine$double.eps^.5)
-      siguv <- 1/ldat$minimum
-      av <- 0
-      lnzv <- ldat$objective
-      conv <-0
-      convm <- "Converged"
-    }else{
-      ldat  <- stats::optim(par0,fn=RSSp_evd_mvd_prec,dvec=dvec,quh=quh,lower = minb,upper = maxb,method = "L-BFGS-B")
-      siguv <- 1/ldat$par[1]
-      av <- ldat$par[2]
-      lnzv <- ldat$value
-      conv <- ldat$convergence
-      convm <- ldat$message
-      if(is.null(convm)){
-        convm <- "Converged"
-      }
-    }
-  }
-
-  retdf <- tibble::data_frame(sigu=siguv,bias=av,lnZ=lnzv,
-                              convergence=conv,
-                              message=convm,
-                              fgeneid=fgeneid,
-                              log_params=log_params,
-                              method=ifelse(doConfound,"Confound","NoConfound"),
-                              pve=p_n*sigu^2)
-  return(retdf)
-}
-RSSp_estimate_grid <- function(data_df,sigu_bounds=NULL,bias_bounds=c(0,1),grid_points=10){
-  fgeneid <- unique(data_df$fgeneid)
-  stopifnot(length(fgeneid)==1)
-  
-  stopifnot(length(bias_bounds)==2)
-  p_n <- unique(data_df$p_n)
+RSSp_estimate_grid <- function(v_hat,eigenvalues,
+                               p_n,
+                               grid_points=10,
+                               sigu_grid=calc_sigu(seq(from = .Machine$double.eps,
+                                                                                  to = 1- .Machine$double.eps,length.out = grid_points),p_n),
+                               bias_grid=c(0),...){
+  p_n <- unique(p_n)
   stopifnot(length(p_n)==1)
-  if(is.null(sigu_bounds)){
-    sigu_bounds <- calc_sigu(c(.Machine$double.eps,1-.Machine$double.eps),p_n)
-  }
-  stopifnot(length(sigu_bounds)==2)
-  varu_bounds <- sigu_bounds^2
+  varu_grid <- sigu_grid^2
   fnf <- RSSp_evd_mvd
 
-  stopifnot(!anyNA(sigu_bounds))
-  stopifnot(!anyNA(varu_bounds))
-  stopifnot(!anyNA(bias_bounds))
-  v_seq <- unique(seq(varu_bounds[1],varu_bounds[2],length.out = grid_points))
-  cf_seq <- unique(seq(bias_bounds[1],bias_bounds[2],length.out = grid_points))
-  ret_df <- purrr::cross2(v_seq,cf_seq) %>% 
+  stopifnot(!anyNA(varu_grid))
+  stopifnot(!anyNA(bias_grid))
+  stopifnot(all(eigenvalues>0))
+  #v_seq <- unique(seq(varu_bounds[1],varu_bounds[2],length.out = grid_points))
+  #cf_seq <- unique(seq(bias_bounds[1],bias_bounds[2],length.out = grid_points))
+  ret_df <- purrr::cross2(varu_grid,bias_grid) %>% 
     purrr::map(purrr::as_vector) %>% 
-    map_df(~data_frame(varu=.x[1],bias=.x[2],lnZ=evd_dnorm(par=.x,dvec=data_df$D,quh=data_df$quh))) %>% 
-             dplyr::mutate(fgeneid=fgeneid,pve=calc_pve(sqrt(varu),p_n))
-  return(ret_df)
+    purrr::map_df(~tibble::data_frame(sigu=sqrt(.x[1]),
+                       pve=calc_pve(sigu,p_n),
+                       varu=.x[1],
+                       bias=.x[2],
+                       lnZ=-evd_dnorm(par=.x,dvec=eigenvalues,quh=v_hat))) %>% return()
 }
 
 
@@ -343,23 +263,28 @@ RSSp_mom <- function(data_df,p_n=NULL,doConfound=F){
               
 }
 
-RSSp_estimate <- function(data_df,sigu_bounds= NULL,a_bounds=c(0,1),p_n=NULL,doConfound=T,calc_H=T,calc_var=T){
+
+
+RSSp_pvv <- function(data_df,pvv=1.0){
+  
+}
+
+RSSp_estimate <- function(data_df,pve_bounds=c(.Machine$double.eps,1-.Machine$double.eps),p_n=NULL,doConfound=F,a_bounds=c(0,0),eigenvalue_cutoff=1e-3,calc_H=F,calc_var=F){
   truncate_data <- T
-  useGradient=T
+  useGradient=F
   log_params <- F
-  if(truncate_data){
-    data_df <- dplyr::filter(data_df,D>2*.Machine$double.eps)
-  }
+  
+  data_df <- dplyr::filter(data_df,D>eigenvalue_cutoff)
+  stopifnot(nrow(data_df)>0)
   stopifnot(all(data_df$D>0))
   stopifnot(length(unique(data_df$fgeneid))==1)
   stopifnot(length(a_bounds)==2)
-  if(!is.null(data_df$p_n)){
+  if(!is.null(data_df[["p_n"]])){
     p_n <- unique(data_df$p_n)
   }
   stopifnot(length(p_n)==1)
-  if(is.null(sigu_bounds)){
-    sigu_bounds <- calc_sigu(c(.Machine$double.eps,1-.Machine$double.eps),p_n)
-  }
+  sigu_bounds <- calc_sigu(pve_bounds,p_n)
+
   stopifnot(length(sigu_bounds)==2)
   varu_bounds <- sigu_bounds^2
   optim_method <- "L-BFGS-B"
@@ -416,10 +341,6 @@ RSSp_estimate <- function(data_df,sigu_bounds= NULL,a_bounds=c(0,1),p_n=NULL,doC
   if(is.null(convm)){
     convm <- "Converged"
   }
-
-
-
-
   retdf <- tibble::data_frame(sigu=siguv,bias=av,lnZ=lnzv,
                               convergence=conv,
                               message=convm,

@@ -81,19 +81,3 @@ block_mat_mul <- function(mat_l, ymat, transpose_mat_l = FALSE) {
     .Call('_RSSp_block_mat_mul', PACKAGE = 'RSSp', mat_l, ymat, transpose_mat_l)
 }
 
-rcppeigen_hello_world <- function() {
-    .Call('_RSSp_rcppeigen_hello_world', PACKAGE = 'RSSp')
-}
-
-rcppeigen_outerproduct <- function(x) {
-    .Call('_RSSp_rcppeigen_outerproduct', PACKAGE = 'RSSp', x)
-}
-
-rcppeigen_innerproduct <- function(x) {
-    .Call('_RSSp_rcppeigen_innerproduct', PACKAGE = 'RSSp', x)
-}
-
-rcppeigen_bothproducts <- function(x) {
-    .Call('_RSSp_rcppeigen_bothproducts', PACKAGE = 'RSSp', x)
-}
-
