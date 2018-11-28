@@ -269,57 +269,55 @@ RSSp_pvv <- function(data_df,pvv=1.0){
   
 }
 
-RSSp_estimate <- function(data_df,pve_bounds=c(.Machine$double.eps,1-.Machine$double.eps),p_n=NULL,doConfound=F,a_bounds=c(0,0),eigenvalue_cutoff=1e-3,calc_H=F,calc_var=F){
+gen_trait_uuid <- function(){
+    paste(sample(c(letters[1:6],0:9),30,replace=TRUE),collapse="")
+}
+RSSp_estimate <- function(quh,D,p_n=NULL,trait_id=gen_trait_uuid(),pve_bounds=c(.Machine$double.eps,1-.Machine$double.eps),doConfound=F,a_bounds=c(0,0),eigenvalue_cutoff=1e-3,calc_H=F,calc_var=F){
   truncate_data <- T
   useGradient=F
   log_params <- F
   
-  data_df <- dplyr::filter(data_df,D>eigenvalue_cutoff)
+  data_df <- data_frame(quh=quh,D=D) %>% dplyr::filter(D>eigenvalue_cutoff)
   stopifnot(nrow(data_df)>0)
   stopifnot(all(data_df$D>0))
-  stopifnot(length(unique(data_df$fgeneid))==1)
   stopifnot(length(a_bounds)==2)
-  if(!is.null(data_df[["p_n"]])){
-    p_n <- unique(data_df$p_n)
-  }
-  stopifnot(length(p_n)==1)
+  stopifnot(length(p_n)==1,!is.null(p_n))
   sigu_bounds <- calc_sigu(pve_bounds,p_n)
-
   stopifnot(length(sigu_bounds)==2)
   varu_bounds <- sigu_bounds^2
   optim_method <- "L-BFGS-B"
   if(useGradient){
-    if(log_params){
-      grf <- RSSp_evd_lmvd_grad
-    }else{
-      grf <- RSSp_evd_mvd_grad
-    }
+      if(log_params){
+          grf <- RSSp_evd_lmvd_grad
+      }else{
+          grf <- RSSp_evd_mvd_grad
+      }
   }else{
-    grf <- NULL
-    if(!doConfound){
-      optim_method <- "Brent"
-    }
+      grf <- NULL
+      if(!doConfound){
+          optim_method <- "Brent"
+      }
   }
 
   if(log_params){
-    fnf <- RSSp_evd_lmvd
-    sigu_bounds <- log(sigu_bounds)
-    varu_bounds <- log(varu_bounds)
-    a_bounds <- log(a_bounds+.Machine$double.eps)
+      fnf <- RSSp_evd_lmvd
+      sigu_bounds <- log(sigu_bounds)
+      varu_bounds <- log(varu_bounds)
+      a_bounds <- log(a_bounds+.Machine$double.eps)
   }else{
-    fnf <- RSSp_evd_mvd
+      fnf <- RSSp_evd_mvd
   }
   stopifnot(!anyNA(sigu_bounds))
   stopifnot(!anyNA(varu_bounds))
   stopifnot(!anyNA(a_bounds))
   if(doConfound){
-    minb <- c(varu_bounds[1],
-              a_bounds[1])
-    maxb <- c(varu_bounds[2],
-              a_bounds[2])
+      minb <- c(varu_bounds[1],
+                a_bounds[1])
+      maxb <- c(varu_bounds[2],
+                a_bounds[2])
   }else{
-    minb <- c(varu_bounds[1])
-    maxb <- c(varu_bounds[2])
+      minb <- c(varu_bounds[1])
+      maxb <- c(varu_bounds[2])
   }
   par0 <- stats::runif(length(minb),min=minb,max = maxb)
   dvec <- data_df$D
@@ -329,8 +327,8 @@ RSSp_estimate <- function(data_df,pve_bounds=c(.Machine$double.eps,1-.Machine$do
   ldat  <- stats::optim(par=par0,fn=fnf,gr=grf,lower=minb,upper=maxb,dvec=dvec,quh=quh,method=optim_method,hessian=calc_H)
   par_ret <- ldat$par
   if(log_params){
-    par_ret <- exp(par_ret)
-    sigu_bounds <- exp(sigu_bounds)
+      par_ret <- exp(par_ret)
+      sigu_bounds <- exp(sigu_bounds)
   }
   varuv <- par_ret[1]
   siguv <- sqrt(varuv)
@@ -339,12 +337,12 @@ RSSp_estimate <- function(data_df,pve_bounds=c(.Machine$double.eps,1-.Machine$do
   conv <- ldat$convergence
   convm <- ldat$message
   if(is.null(convm)){
-    convm <- "Converged"
+      convm <- "Converged"
   }
   retdf <- tibble::data_frame(sigu=siguv,bias=av,lnZ=lnzv,
                               convergence=conv,
                               message=convm,
-                              fgeneid=as.character(data_df[["fgeneid"]][1]),
+                              trait_id=as.character(trait_id),
                               log_params=log_params,
                               useGradient=useGradient,
                               optim=T,
@@ -352,36 +350,36 @@ RSSp_estimate <- function(data_df,pve_bounds=c(.Machine$double.eps,1-.Machine$do
                               pve=p_n*sigu^2)
   
   if(calc_H){
-    Hmat <- ldat$hessian
-    if(doConfound){
-      Hvar <- purrr::possibly(solve,otherwise = matrix(NA_real_,2,2))(Hmat)/sqrt(length(dvec))
-      sigu_var_h <- Hvar[1,1]
-      bias_var_h <- Hvar[2,2]
-      sigu_bias_cov_h <- Hvar[1,2]
-    }else{
-      Hvar <- (1/(Hmat))/sqrt(length(dvec))
-      sigu_var_h <- Hvar[1,1]
-      bias_var_h <- 0
-      sigu_bias_cov_h <- 0
-    }
-    H_det <- det(Hmat)
-    retdf <- dplyr::mutate(retdf,
-                           sigu_var_h=sigu_var_h,
-                           bias_var_h=bias_var_h,
-                           sigu_bias_cov_h=sigu_bias_cov_h,
-                           H_det=H_det)
-  }
-    if(calc_var){
+      Hmat <- ldat$hessian
       if(doConfound){
-        Imat <- RSSp_information(par = ldat$par,dvec = dvec)
-        sigu_var <- 1/Imat[1,1]
-        bias_var <- 1/Imat[2,2]
-        sigu_bias_cov <- 1/Imat[1,2]
+          Hvar <- purrr::possibly(solve,otherwise = matrix(NA_real_,2,2))(Hmat)/sqrt(length(dvec))
+          sigu_var_h <- Hvar[1,1]
+          bias_var_h <- Hvar[2,2]
+          sigu_bias_cov_h <- Hvar[1,2]
       }else{
-        Imat <- RSSp_information_nc(par=ldat$par,dvec=dvec)
-        sigu_var <- 1/Imat[1,1]
-        bias_var <- 0
-        sigu_bias_cov <- 0
+          Hvar <- (1/(Hmat))/sqrt(length(dvec))
+          sigu_var_h <- Hvar[1,1]
+          bias_var_h <- 0
+          sigu_bias_cov_h <- 0
+      }
+      H_det <- det(Hmat)
+      retdf <- dplyr::mutate(retdf,
+                             sigu_var_h=sigu_var_h,
+                             bias_var_h=bias_var_h,
+                             sigu_bias_cov_h=sigu_bias_cov_h,
+                             H_det=H_det)
+  }
+  if(calc_var){
+      if(doConfound){
+          Imat <- RSSp_information(par = ldat$par,dvec = dvec)
+          sigu_var <- 1/Imat[1,1]
+          bias_var <- 1/Imat[2,2]
+          sigu_bias_cov <- 1/Imat[1,2]
+      }else{
+          Imat <- RSSp_information_nc(par=ldat$par,dvec=dvec)
+          sigu_var <- 1/Imat[1,1]
+          bias_var <- 0
+          sigu_bias_cov <- 0
       }
       Fisher_det <- det(Imat)
       retdf <- dplyr::mutate(retdf,
