@@ -14,6 +14,35 @@ posterior_mean_v <- function(sigu,dvec,quh){
 posterior_mean_beta <- function(sigu,dvec,se,Q,quh){
   return(se*posterior_mean_u(sigu,dvec,Q,quh))
 }
+
+
+estimate_pve <- function(dvec,quh,cvec,N,n_samples=0){
+  
+  num_c <- length(cvec)
+  
+  if(num_c>1){
+    stop("multiple cvec terms not yet implemented")
+  }
+  if(n_samples!=0){
+    stop("sampling based pve estimate not yet implemented")
+  }
+  # lambda_init <- 0
+  
+  
+  tmp <- 1+1/(cvec*dvec)
+  rto <- (quh^2)/((dvec)^2)
+  rto <- dvec*rto
+  rto <- rto/(tmp^2)
+  
+  pve_mean <- sum(1/tmp)+sum(rto)
+  pve_mean <- pve_mean/N
+  
+  
+  return(pve_mean)
+  
+}
+
+
 # 
 # d_sigma <- function(sigu,dvec){
 #   # D_\Sigma from https://crerecombinase.github.io/PolygenicRSS/RSSp_Posterior.html

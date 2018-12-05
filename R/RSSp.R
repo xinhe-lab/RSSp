@@ -272,7 +272,19 @@ RSSp_pvv <- function(data_df,pvv=1.0){
 gen_trait_uuid <- function(){
     paste(sample(c(letters[1:6],0:9),30,replace=TRUE),collapse="")
 }
-RSSp_estimate <- function(quh,D,p_n=NULL,trait_id=gen_trait_uuid(),pve_bounds=c(.Machine$double.eps,1-.Machine$double.eps),doConfound=F,a_bounds=c(0,0),eigenvalue_cutoff=1e-3,calc_H=F,calc_var=F){
+
+#@export
+RSSp_estimate <- function(quh,
+                          D,
+                          p_n=NULL,
+                          trait_id=gen_trait_uuid(),
+                          pve_bounds=c(.Machine$double.eps,1-.Machine$double.eps),
+                          doConfound=F,
+                          a_bounds=c(0,0),
+                          eigenvalue_cutoff=1e-3,
+                          calc_H=F,
+                          calc_var=F,
+                          alt_pve=T){
   truncate_data <- T
   useGradient=F
   log_params <- F
@@ -339,15 +351,13 @@ RSSp_estimate <- function(quh,D,p_n=NULL,trait_id=gen_trait_uuid(),pve_bounds=c(
   if(is.null(convm)){
       convm <- "Converged"
   }
+  pve=estimate_pve(dvec=D,quh=quh,cvec=varuv,N=sum(D)/p_n)
+  
   retdf <- tibble::data_frame(sigu=siguv,bias=av,lnZ=lnzv,
                               convergence=conv,
-                              message=convm,
                               trait_id=as.character(trait_id),
-                              log_params=log_params,
-                              useGradient=useGradient,
-                              optim=T,
                               method=ifelse(doConfound,"Confound","NoConfound"),
-                              pve=p_n*sigu^2)
+                              pve=pve)
   
   if(calc_H){
       Hmat <- ldat$hessian
@@ -396,6 +406,9 @@ RSSp_estimate <- function(quh,D,p_n=NULL,trait_id=gen_trait_uuid(),pve_bounds=c(
                          sigu_max_bound=sigu_bounds[2],
                          confound_min_bound=ifelse(doConfound,minb[2],0),
                          confound_max_bound=ifelse(doConfound,maxb[2],0))
+  if(alt_pve){
+    retdf <- mutate(retdf,alt_pve=p_n*sigu^2)
+  }
 
 
   return(retdf)

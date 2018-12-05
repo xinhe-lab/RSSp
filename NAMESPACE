@@ -1,5 +1,4 @@
 useDynLib(RSSp)
 import(RcppEigen)
 importFrom(Rcpp, evalCpp)
-exportPattern("^[[:alpha:]]+")
 importFrom(magrittr,"%>%")

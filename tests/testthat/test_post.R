@@ -1,30 +1,38 @@
 context("test posterior estimation")
 
 
-
-test_that("Matrix form for computing D**",{
+test_that("C++ implementation of SPVE",{
   
-  g <- 10
-  p <- 20
-  sigu <- runif(g)
-  confound <- runif( g)
-  dvec <- runif(p)
-  Rd <- matrix(0,p,g)
-
-  for(i in 1:g){
-    Rd[,i] <- posterior_mean_d(sigu[i],confound[i],dvec)
+  spve_R <- function(R,b,bh,se,n){
+    tbh <- b/sqrt(n*se+bh^2)
+    return(sum((tb%o%tb)*R))
   }
-  expect_equal(
-    dim(Rd),
-    c(p,g)
-  )
-  cd <- posterior_mean_D(
-    sigu,
-    confound,
-    dvec)
-  expect_equal(dim(Rd),dim(cd))
-  expect_equal(cd,Rd)
+  
+  
 })
+# test_that("Matrix form for computing D**",{
+#   
+#   g <- 10
+#   p <- 20
+#   sigu <- runif(g)
+#   confound <- runif( g)
+#   dvec <- runif(p)
+#   Rd <- matrix(0,p,g)
+# 
+#   for(i in 1:g){
+#     Rd[,i] <- posterior_mean_d(sigu[i],confound[i],dvec)
+#   }
+#   expect_equal(
+#     dim(Rd),
+#     c(p,g)
+#   )
+#   cd <- posterior_mean_D(
+#     sigu,
+#     confound,
+#     dvec)
+#   expect_equal(dim(Rd),dim(cd))
+#   expect_equal(cd,Rd)
+# })
 
 test_that("matrix form computing U",{
   g <- 10
