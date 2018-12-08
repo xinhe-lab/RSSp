@@ -100,6 +100,7 @@ RSSp_estimate <- function(quh,
                           eigenvalue_cutoff=1e-3,
                           calc_H=F,
                           alt_pve=F){
+  useGradient <- T
   p <- sum(D)
   quh <- quh[D>eigenvalue_cutoff]
   D <- D[D>eigenvalue_cutoff]
@@ -115,13 +116,15 @@ RSSp_estimate <- function(quh,
   optim_method <- "L-BFGS-B"
   if(useGradient){
     grf <- evd_dnorm_grad_stan
-      
+    if(nterms==1){
+      optim_method <- "Brent"
+    }
   }else{
     grf <- NULL
   }
   stopifnot(!anyNA(varu_bound_mat))
-  par0 <- stats::runif(nterms,min=varu_bound_mat[1,],max = varu_bound_mat[2,])
-  ldat  <- stats::optim(par=par0,fn=evd_dnorm,gr=grf,lower=minb,upper=maxb,D=D,quh=quh,method=optim_method,hessian=calc_H)
+  par0 <- stats::runif(nterms,min=c(varu_bound_mat[1,]),max = c(varu_bound_mat[2,]))
+  ldat  <- stats::optim(par=par0,fn=evd_dnorm,gr=grf,lower=c(varu_bound_mat[1,]),upper=c(varu_bound_mat[2,]),D=D,quh=quh,method=optim_method,hessian=calc_H)
   par_ret <- ldat$par
   varuv <- par_ret[1]
   siguv <- sqrt(varuv)
@@ -136,18 +139,18 @@ RSSp_estimate <- function(quh,
   retdf <- tibble::data_frame(sigu=siguv,bias=list(par_ret[-1]),lnZ=lnzv,
                               convergence=conv,
                               trait_id=as.character(trait_id),
-                              method=ifelse(doConfound,"Confound","NoConfound"),
+                              nterms=nterms,
                               pve=pve)
   
   if(calc_H){
       Hmat <- ldat$hessian
       if(nterms>1){
-          Hvar <- purrr::possibly(solve,otherwise = matrix(NA_real_,nterms,nterms))(Hmat)/sqrt(length(dvec))
+          Hvar <- purrr::possibly(solve,otherwise = matrix(NA_real_,nterms,nterms))(Hmat)/sqrt(length(D))
           # sigu_var_h <- Hvar[1,1]
           # bias_var_h <- Hvar[2,2]
           # sigu_bias_cov_h <- Hvar[1,2]
       }else{
-          Hvar <- (1/(Hmat))/sqrt(length(dvec))
+          Hvar <- (1/(Hmat))/sqrt(length(D))
           # sigu_var_h <- Hvar[1,1]
           # bias_var_h <- 0
           # sigu_bias_cov_h <- 0

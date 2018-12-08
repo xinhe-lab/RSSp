@@ -37,7 +37,7 @@ test_that("C++ implementation of SPVE",{
   
   
   expect_equal(R_estimate_pve(par,D = D,quh = quh,N = N,n_samples = 0),
-               estimate_pve(cvec = par,D = D,quh = quh,sample_size=N))
+               estimate_pve(cvec = par,D = D,quh = quh,sample_size =N))
   
   # 
   # spve_R <- function(R,b,bh,se,n){

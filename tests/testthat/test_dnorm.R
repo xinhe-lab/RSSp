@@ -39,20 +39,41 @@ test_that("fancy templated likelihood works like toy R version with confounding"
 })
 
 
-test_that("fancy templated likelihood works like toy R version without confounding",{
+test_that("We can estimate the right answer with no confounding and direct simulation",{
   
-  p <- 4
-  quh <- rnorm(p)
+  p <- 1e3
+  g <- 1000
   D <- runif(p)/runif(p)  
-  par <- c(runif(1))
-
-  expect_equal(-sum(dnorm(quh,mean=0,sd=sqrt(par*(D*D)+D),log=T)),
-               evd_dnorm(par,D = D,quh = quh))
-
+  N <- 1e6
+  pvevec <- 0.5
+  parvec <- RSSp:::calc_varu(pve = pvevec,p_n=sum(D)/N)
+  rvec <- numeric(g)
+  pb <- progress::progress_bar$new(total=g)
+  # oquh <- rnorm(n = p)
+  for(i in 1:g){
+    quh <- rnorm(p,mean=0,sd=sqrt(pvevec*(D*D)+D))
+    result <- RSSp_estimate(quh,D,N,nterms = 5,calc_H = T)
+    rvec[i] <- result$pve
+    pb$tick()
+  }
+  
+  expect_equal(mean(rvec-pvevec),0,tolerance=1e-1)
+  expect_equal(mean(abs(rvec-pvevec)/pvevec),0,tolerance=2e-1)
+  
+  data_frame(me=rvec,truth=pvevec) %>% ggplot(aes(x=truth,y=(me-truth)/truth))+geom_point()+geom_smooth(method="lm")
+  # data_frame(mr=rpar*(D*D)+D,tr=par*(D*D)+D) %>%
+  #   ggplot(aes(x=tr,y=mr))+
+  #   geom_hex()+
+  #   geom_smooth(method="lm")+
+  #   geom_abline(intercept=0,slope=1)
+  expect_equal((rpar-par)/par,0,tolerance=1e-1)
+  
   expect_equal(-sum(dnorm(quh,mean=0,sd=sqrt(ts),log=T)),
                simple_log_likelihood(quh,ts))
   expect_equal(-sum(dnorm(quh,mean=0,sd=sqrt(D^2*par+D)),log=T),
                evd_dnorm_t(par,D,quh))
   
-
+  
 })
+
+
