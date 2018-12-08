@@ -43,7 +43,7 @@ gensplit_uh_uf <- function(uh,region_id){
 #' @param dvec uhat a vector of length `p` containing eigenvalues
 #' @param cvec an estimate of the variance
 #' @param N the sample size
-estimate_pve <- function(dvec,quh,cvec,N,n_samples=0){
+estimate_pve <- function(cvec,D,quh,N,n_samples=0){
 
   num_c <- length(cvec)
 
@@ -54,9 +54,9 @@ estimate_pve <- function(dvec,quh,cvec,N,n_samples=0){
     stop("sampling based pve estimate not yet implemented")
   }
   # lambda_init <- 0
-  tmp <- 1+1/(cvec*dvec)
-  rto <- (quh^2)/((dvec)^2)
-  rto <- dvec*rto
+  tmp <- 1+1/(cvec*D)
+  rto <- (quh^2)/((D)^2)
+  rto <- D*rto
   rto <- rto/(tmp^2)
 
   pve_mean <- sum(1/tmp)+sum(rto)

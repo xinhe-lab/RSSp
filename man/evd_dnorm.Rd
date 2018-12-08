@@ -4,7 +4,7 @@
 \alias{evd_dnorm}
 \title{RSSp marginalized likelihood function}
 \usage{
-evd_dnorm(par, dvec, quh)
+evd_dnorm(par, D, quh)
 }
 \arguments{
 \item{par}{a length 2 numeric vector.  `par[1]` corresponds to the sigma_u^2 parameter, and `par[2]` corresponds to the confounding parameter. 

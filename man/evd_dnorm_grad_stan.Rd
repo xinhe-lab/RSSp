@@ -4,7 +4,7 @@
 \alias{evd_dnorm_grad_stan}
 \title{evd_dnorm_grad_stan}
 \usage{
-evd_dnorm_grad_stan(par, dvec, quh)
+evd_dnorm_grad_stan(par, D, quh)
 }
 \arguments{
 \item{par}{a length 2 numeric vector.  `par[1]` corresponds to the sigma_u^2 parameter, and `par[2]` corresponds to the confounding parameter. 

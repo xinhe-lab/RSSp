@@ -11,4 +11,4 @@ Imports: Rcpp (>= 0.12.12), RcppEigen (>= 0.3.3.3.0),StanHeaders,BH,magrittr,dpl
 LinkingTo: Rcpp, RcppEigen,StanHeaders,BH
 Suggests: testthat,
     covr
-RoxygenNote: 6.0.1
+RoxygenNote: 6.1.1

@@ -8,156 +8,55 @@
 using namespace Rcpp;
 
 // evd_dnorm
-double evd_dnorm(const MapA par, const MapA dvec, const MapA quh);
-RcppExport SEXP _RSSp_evd_dnorm(SEXP parSEXP, SEXP dvecSEXP, SEXP quhSEXP) {
+double evd_dnorm(const MapA par, const MapA D, const MapA quh);
+RcppExport SEXP _RSSp_evd_dnorm(SEXP parSEXP, SEXP DSEXP, SEXP quhSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const MapA >::type par(parSEXP);
-    Rcpp::traits::input_parameter< const MapA >::type dvec(dvecSEXP);
+    Rcpp::traits::input_parameter< const MapA >::type D(DSEXP);
     Rcpp::traits::input_parameter< const MapA >::type quh(quhSEXP);
-    rcpp_result_gen = Rcpp::wrap(evd_dnorm(par, dvec, quh));
-    return rcpp_result_gen;
-END_RCPP
-}
-// evd_post_mean
-Eigen::ArrayXd evd_post_mean(const MapA par, const MapA dvec, const MapA quh);
-RcppExport SEXP _RSSp_evd_post_mean(SEXP parSEXP, SEXP dvecSEXP, SEXP quhSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const MapA >::type par(parSEXP);
-    Rcpp::traits::input_parameter< const MapA >::type dvec(dvecSEXP);
-    Rcpp::traits::input_parameter< const MapA >::type quh(quhSEXP);
-    rcpp_result_gen = Rcpp::wrap(evd_post_mean(par, dvec, quh));
-    return rcpp_result_gen;
-END_RCPP
-}
-// evd_post_var
-Eigen::ArrayXd evd_post_var(const MapA par, const MapA dvec);
-RcppExport SEXP _RSSp_evd_post_var(SEXP parSEXP, SEXP dvecSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const MapA >::type par(parSEXP);
-    Rcpp::traits::input_parameter< const MapA >::type dvec(dvecSEXP);
-    rcpp_result_gen = Rcpp::wrap(evd_post_var(par, dvec));
-    return rcpp_result_gen;
-END_RCPP
-}
-// evd_dnorm_grad
-Eigen::ArrayXd evd_dnorm_grad(const MapA par, const MapA dvec, const MapA quh);
-RcppExport SEXP _RSSp_evd_dnorm_grad(SEXP parSEXP, SEXP dvecSEXP, SEXP quhSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const MapA >::type par(parSEXP);
-    Rcpp::traits::input_parameter< const MapA >::type dvec(dvecSEXP);
-    Rcpp::traits::input_parameter< const MapA >::type quh(quhSEXP);
-    rcpp_result_gen = Rcpp::wrap(evd_dnorm_grad(par, dvec, quh));
+    rcpp_result_gen = Rcpp::wrap(evd_dnorm(par, D, quh));
     return rcpp_result_gen;
 END_RCPP
 }
 // evd_dnorm_grad_stan
-Eigen::ArrayXd evd_dnorm_grad_stan(const MapA par, const MapA dvec, const MapA quh);
-RcppExport SEXP _RSSp_evd_dnorm_grad_stan(SEXP parSEXP, SEXP dvecSEXP, SEXP quhSEXP) {
+Eigen::ArrayXd evd_dnorm_grad_stan(const MapA par, const MapA D, const MapA quh);
+RcppExport SEXP _RSSp_evd_dnorm_grad_stan(SEXP parSEXP, SEXP DSEXP, SEXP quhSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const MapA >::type par(parSEXP);
-    Rcpp::traits::input_parameter< const MapA >::type dvec(dvecSEXP);
+    Rcpp::traits::input_parameter< const MapA >::type D(DSEXP);
     Rcpp::traits::input_parameter< const MapA >::type quh(quhSEXP);
-    rcpp_result_gen = Rcpp::wrap(evd_dnorm_grad_stan(par, dvec, quh));
+    rcpp_result_gen = Rcpp::wrap(evd_dnorm_grad_stan(par, D, quh));
     return rcpp_result_gen;
 END_RCPP
 }
 // evd_dnorm_hess_stan
-Eigen::MatrixXd evd_dnorm_hess_stan(const MapA par, const MapA dvec, const MapA quh);
-RcppExport SEXP _RSSp_evd_dnorm_hess_stan(SEXP parSEXP, SEXP dvecSEXP, SEXP quhSEXP) {
+Eigen::MatrixXd evd_dnorm_hess_stan(const MapA par, const MapA D, const MapA quh);
+RcppExport SEXP _RSSp_evd_dnorm_hess_stan(SEXP parSEXP, SEXP DSEXP, SEXP quhSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const MapA >::type par(parSEXP);
-    Rcpp::traits::input_parameter< const MapA >::type dvec(dvecSEXP);
+    Rcpp::traits::input_parameter< const MapA >::type D(DSEXP);
     Rcpp::traits::input_parameter< const MapA >::type quh(quhSEXP);
-    rcpp_result_gen = Rcpp::wrap(evd_dnorm_hess_stan(par, dvec, quh));
+    rcpp_result_gen = Rcpp::wrap(evd_dnorm_hess_stan(par, D, quh));
     return rcpp_result_gen;
 END_RCPP
 }
-// posterior_mean_D
-Eigen::MatrixXd posterior_mean_D(const Eigen::ArrayXd sigu, const Eigen::ArrayXd confound, const Eigen::ArrayXd dvec);
-RcppExport SEXP _RSSp_posterior_mean_D(SEXP siguSEXP, SEXP confoundSEXP, SEXP dvecSEXP) {
+// estimate_pve
+double estimate_pve(const MapA cvec, const MapA D, const MapA quh, int sample_size);
+RcppExport SEXP _RSSp_estimate_pve(SEXP cvecSEXP, SEXP DSEXP, SEXP quhSEXP, SEXP sample_sizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const Eigen::ArrayXd >::type sigu(siguSEXP);
-    Rcpp::traits::input_parameter< const Eigen::ArrayXd >::type confound(confoundSEXP);
-    Rcpp::traits::input_parameter< const Eigen::ArrayXd >::type dvec(dvecSEXP);
-    rcpp_result_gen = Rcpp::wrap(posterior_mean_D(sigu, confound, dvec));
-    return rcpp_result_gen;
-END_RCPP
-}
-// posterior_mean_U
-Eigen::MatrixXd posterior_mean_U(const MapA sigu, const MapA confound, const MapA dvec, const MapMat quh, const MapMat Q);
-RcppExport SEXP _RSSp_posterior_mean_U(SEXP siguSEXP, SEXP confoundSEXP, SEXP dvecSEXP, SEXP quhSEXP, SEXP QSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const MapA >::type sigu(siguSEXP);
-    Rcpp::traits::input_parameter< const MapA >::type confound(confoundSEXP);
-    Rcpp::traits::input_parameter< const MapA >::type dvec(dvecSEXP);
-    Rcpp::traits::input_parameter< const MapMat >::type quh(quhSEXP);
-    Rcpp::traits::input_parameter< const MapMat >::type Q(QSEXP);
-    rcpp_result_gen = Rcpp::wrap(posterior_mean_U(sigu, confound, dvec, quh, Q));
-    return rcpp_result_gen;
-END_RCPP
-}
-// posterior_mean_Beta
-Eigen::MatrixXd posterior_mean_Beta(const MapA sigu, const MapA confound, const MapA dvec, const MapMat quh, const MapMat Q, const MapMat se);
-RcppExport SEXP _RSSp_posterior_mean_Beta(SEXP siguSEXP, SEXP confoundSEXP, SEXP dvecSEXP, SEXP quhSEXP, SEXP QSEXP, SEXP seSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const MapA >::type sigu(siguSEXP);
-    Rcpp::traits::input_parameter< const MapA >::type confound(confoundSEXP);
-    Rcpp::traits::input_parameter< const MapA >::type dvec(dvecSEXP);
-    Rcpp::traits::input_parameter< const MapMat >::type quh(quhSEXP);
-    Rcpp::traits::input_parameter< const MapMat >::type Q(QSEXP);
-    Rcpp::traits::input_parameter< const MapMat >::type se(seSEXP);
-    rcpp_result_gen = Rcpp::wrap(posterior_mean_Beta(sigu, confound, dvec, quh, Q, se));
-    return rcpp_result_gen;
-END_RCPP
-}
-// posterior_mean_Y
-Eigen::MatrixXd posterior_mean_Y(const MapA sigu, const MapA confound, const MapA dvec, const MapMat quh, const MapMat Q, const MapMat se, const MapMat x);
-RcppExport SEXP _RSSp_posterior_mean_Y(SEXP siguSEXP, SEXP confoundSEXP, SEXP dvecSEXP, SEXP quhSEXP, SEXP QSEXP, SEXP seSEXP, SEXP xSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const MapA >::type sigu(siguSEXP);
-    Rcpp::traits::input_parameter< const MapA >::type confound(confoundSEXP);
-    Rcpp::traits::input_parameter< const MapA >::type dvec(dvecSEXP);
-    Rcpp::traits::input_parameter< const MapMat >::type quh(quhSEXP);
-    Rcpp::traits::input_parameter< const MapMat >::type Q(QSEXP);
-    Rcpp::traits::input_parameter< const MapMat >::type se(seSEXP);
-    Rcpp::traits::input_parameter< const MapMat >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(posterior_mean_Y(sigu, confound, dvec, quh, Q, se, x));
-    return rcpp_result_gen;
-END_RCPP
-}
-// posterior_var_Beta
-Eigen::MatrixXd posterior_var_Beta(const MapA sigu, const MapA confound, const MapA dvec, const MapMat quh, const MapMat Q, const MapMat se);
-RcppExport SEXP _RSSp_posterior_var_Beta(SEXP siguSEXP, SEXP confoundSEXP, SEXP dvecSEXP, SEXP quhSEXP, SEXP QSEXP, SEXP seSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const MapA >::type sigu(siguSEXP);
-    Rcpp::traits::input_parameter< const MapA >::type confound(confoundSEXP);
-    Rcpp::traits::input_parameter< const MapA >::type dvec(dvecSEXP);
-    Rcpp::traits::input_parameter< const MapMat >::type quh(quhSEXP);
-    Rcpp::traits::input_parameter< const MapMat >::type Q(QSEXP);
-    Rcpp::traits::input_parameter< const MapMat >::type se(seSEXP);
-    rcpp_result_gen = Rcpp::wrap(posterior_var_Beta(sigu, confound, dvec, quh, Q, se));
+    Rcpp::traits::input_parameter< const MapA >::type cvec(cvecSEXP);
+    Rcpp::traits::input_parameter< const MapA >::type D(DSEXP);
+    Rcpp::traits::input_parameter< const MapA >::type quh(quhSEXP);
+    Rcpp::traits::input_parameter< int >::type sample_size(sample_sizeSEXP);
+    rcpp_result_gen = Rcpp::wrap(estimate_pve(cvec, D, quh, sample_size));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -194,16 +93,9 @@ END_RCPP
 
 static const R_CallMethodDef CallEntries[] = {
     {"_RSSp_evd_dnorm", (DL_FUNC) &_RSSp_evd_dnorm, 3},
-    {"_RSSp_evd_post_mean", (DL_FUNC) &_RSSp_evd_post_mean, 3},
-    {"_RSSp_evd_post_var", (DL_FUNC) &_RSSp_evd_post_var, 2},
-    {"_RSSp_evd_dnorm_grad", (DL_FUNC) &_RSSp_evd_dnorm_grad, 3},
     {"_RSSp_evd_dnorm_grad_stan", (DL_FUNC) &_RSSp_evd_dnorm_grad_stan, 3},
     {"_RSSp_evd_dnorm_hess_stan", (DL_FUNC) &_RSSp_evd_dnorm_hess_stan, 3},
-    {"_RSSp_posterior_mean_D", (DL_FUNC) &_RSSp_posterior_mean_D, 3},
-    {"_RSSp_posterior_mean_U", (DL_FUNC) &_RSSp_posterior_mean_U, 5},
-    {"_RSSp_posterior_mean_Beta", (DL_FUNC) &_RSSp_posterior_mean_Beta, 6},
-    {"_RSSp_posterior_mean_Y", (DL_FUNC) &_RSSp_posterior_mean_Y, 7},
-    {"_RSSp_posterior_var_Beta", (DL_FUNC) &_RSSp_posterior_var_Beta, 6},
+    {"_RSSp_estimate_pve", (DL_FUNC) &_RSSp_estimate_pve, 4},
     {"_RSSp_simuh_dir_cpp", (DL_FUNC) &_RSSp_simuh_dir_cpp, 7},
     {"_RSSp_block_mat_mul", (DL_FUNC) &_RSSp_block_mat_mul, 3},
     {NULL, NULL, 0}
