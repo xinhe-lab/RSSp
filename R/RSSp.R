@@ -99,8 +99,8 @@ RSSp_estimate <- function(quh,
                           nterms=1,
                           eigenvalue_cutoff=1e-3,
                           calc_H=F,
-                          alt_pve=F){
-  useGradient <- T
+                          alt_pve=F,useGradient=T){
+  #useGradient <- T
   p <- sum(D)
   quh <- quh[D>eigenvalue_cutoff]
   D <- D[D>eigenvalue_cutoff]
@@ -136,7 +136,7 @@ RSSp_estimate <- function(quh,
   }
   pve=estimate_pve(cvec=par_ret,D = D,quh=quh,sample_size = sample_size)
   
-  retdf <- tibble::data_frame(sigu=siguv,bias=list(par_ret[-1]),lnZ=lnzv,
+  retdf <- tibble::data_frame(sigu=siguv,bias=list(tibble::data_frame(term_no=seq_along(par_ret[-1]),value=par_ret[-1])),lnZ=lnzv,data=list(data_frame(quh=quh,D=D)),
                               convergence=conv,
                               trait_id=as.character(trait_id),
                               nterms=nterms,
@@ -162,6 +162,7 @@ RSSp_estimate <- function(quh,
   if(alt_pve){
     retdf <- mutate(retdf,alt_pve=p_n*sigu^2)
   }
+  class(retdf) <- "rssp"
   return(retdf)
 }
 

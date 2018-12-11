@@ -11,14 +11,25 @@ evd_dnorm <- function(par, D, quh) {
 }
 
 #' evd_dnorm_grad_stan
-#' 
-#' This is an attempt to use stan's AD features to calculate a gradient 
+#'
+#' This is an attempt to use stan's AD features to calculate a gradient
 #' for the RSSp likelihood
-#' 
+#'
 #' @template RSSp_stat
 #' @export
 evd_dnorm_grad_stan <- function(par, D, quh) {
     .Call('_RSSp_evd_dnorm_grad_stan', PACKAGE = 'RSSp', par, D, quh)
+}
+
+#' evd_dnorm_grad_stan
+#'
+#' This is an attempt to use stan's AD features to calculate a gradient
+#' for the RSSp likelihood
+#'
+#' @template RSSp_stat
+#' @export
+evd_dnorm_stan <- function(par, D, quh) {
+    .Call('_RSSp_evd_dnorm_stan', PACKAGE = 'RSSp', par, D, quh)
 }
 
 #' evd_dnorm_hess_stan

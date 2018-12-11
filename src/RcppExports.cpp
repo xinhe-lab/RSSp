@@ -33,6 +33,19 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// evd_dnorm_stan
+double evd_dnorm_stan(const MapA par, const MapA D, const MapA quh);
+RcppExport SEXP _RSSp_evd_dnorm_stan(SEXP parSEXP, SEXP DSEXP, SEXP quhSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const MapA >::type par(parSEXP);
+    Rcpp::traits::input_parameter< const MapA >::type D(DSEXP);
+    Rcpp::traits::input_parameter< const MapA >::type quh(quhSEXP);
+    rcpp_result_gen = Rcpp::wrap(evd_dnorm_stan(par, D, quh));
+    return rcpp_result_gen;
+END_RCPP
+}
 // evd_dnorm_hess_stan
 Eigen::MatrixXd evd_dnorm_hess_stan(const MapA par, const MapA D, const MapA quh);
 RcppExport SEXP _RSSp_evd_dnorm_hess_stan(SEXP parSEXP, SEXP DSEXP, SEXP quhSEXP) {
@@ -94,6 +107,7 @@ END_RCPP
 static const R_CallMethodDef CallEntries[] = {
     {"_RSSp_evd_dnorm", (DL_FUNC) &_RSSp_evd_dnorm, 3},
     {"_RSSp_evd_dnorm_grad_stan", (DL_FUNC) &_RSSp_evd_dnorm_grad_stan, 3},
+    {"_RSSp_evd_dnorm_stan", (DL_FUNC) &_RSSp_evd_dnorm_stan, 3},
     {"_RSSp_evd_dnorm_hess_stan", (DL_FUNC) &_RSSp_evd_dnorm_hess_stan, 3},
     {"_RSSp_estimate_pve", (DL_FUNC) &_RSSp_estimate_pve, 4},
     {"_RSSp_simuh_dir_cpp", (DL_FUNC) &_RSSp_simuh_dir_cpp, 7},

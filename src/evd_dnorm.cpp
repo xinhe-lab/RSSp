@@ -24,7 +24,7 @@ double t_evd_dnorm(const Eigen::Array<double,N,1> cvec ,const MapA D, const MapA
   for(int i=0; i<p; i++){
     double tvar=D[i];
     for (int k = 0; k < N; k++) {
-      tvar += cvec[k] * D[i] * std::pow(D[i], 2 - k);
+      tvar += cvec[k] * std::pow(D[i], 2 - k);
     }
     tot_sum += std::log(tvar) + (quh[i] * quh[i]) / tvar;
   }
@@ -109,26 +109,39 @@ double evd_dnorm(const MapA par, const MapA D, const MapA quh) {
 }
 
 //Borrowed heavily from https://arxiv.org/pdf/1509.07164.pdf
+
 struct evd_dens {
   const MapA D;
   const MapA quh;
   const size_t p;
-  evd_dens(const MapA D_,const MapA quh_): D(D_),quh(quh_),p(quh.size()){}
-  
+  const size_t N;
+  evd_dens(const MapA D_,const MapA quh_,const size_t N_): D(D_),quh(quh_),p(quh.size()),N(N_){}
   template <typename T>
   T operator()(const Eigen::Matrix<T,Eigen::Dynamic,1> &theta) const{
-    const double p=static_cast<double>(D.size());
-    const size_t N=theta.size();
+    const T p=static_cast<T>(D.size());
     T tot_sum=0;
     for(int i=0; i<p; i++){
       T tvar=D[i];
       for (int k = 0; k < N; k++) {
-        tvar += theta[k] * D[i] * std::pow(D[i], 2 - k);
+        tvar += theta[k] * std::pow(D[i], 2 - k);
       }
       tot_sum += log(tvar) + (quh[i] * quh[i]) / tvar;
     }
-    return -0.5 * (tot_sum)-0.5 * p * log(2 * M_PI);
+    return -(-0.5 * (tot_sum)-0.5 * p * log(2 * M_PI));
   }
+
+  //   const double p=static_cast<double>(D.size());
+  //   const size_t N=theta.size();
+  //   T tot_sum=0;
+  //   for(int i=0; i<p; i++){
+  //     T tvar=D[i];
+  //     for (int k = 0; k < N; k++) {
+  //       tvar += theta[k] * D[i] * std::pow(D[i], 2 - k);
+  //     }
+  //     tot_sum += log(tvar) + (quh[i] * quh[i]) / tvar;
+  //   }
+  //   return -0.5 * (tot_sum)-0.5 * p * log(2 * M_PI);
+  // }
 };
 
 
@@ -136,10 +149,10 @@ struct evd_dens {
 
 
 //' evd_dnorm_grad_stan
-//' 
-//' This is an attempt to use stan's AD features to calculate a gradient 
+//'
+//' This is an attempt to use stan's AD features to calculate a gradient
 //' for the RSSp likelihood
-//' 
+//'
 //' @template RSSp_stat
 //' @export
 //[[Rcpp::export]]
@@ -149,17 +162,56 @@ Eigen::ArrayXd evd_dnorm_grad_stan(const MapA par,const MapA D, const MapA quh){
   // const double a=par(1);
   // Rcpp::Rcout<<"sigu is :"<<sigu<<std::endl;
   double fx=0;
-  Eigen::Matrix <double,Eigen::Dynamic,1> grad_fx;
-  Eigen::Matrix <double,Eigen::Dynamic,1> param=par;
+
+
   // param(0)=varu;
   // param(1)=a;
   // Rcpp::Rcout<<"param:"<<param<<std::endl;
-  evd_dens f(D,quh);
+
+
+  int num_terms=par.size();
+  evd_dens f(D,quh,num_terms);
   //  Rcpp::Rcout<<"Struct constructed!"<<std::endl;
+  Eigen::Matrix<double,Eigen::Dynamic,1> param(par);
+  Eigen::Matrix <double,Eigen::Dynamic,1> grad_fx;
   stan::math::gradient(f,param,fx,grad_fx);
-  //  Rcpp::Rcout<<"Gradient computed!"<<std::endl;
-  return(grad_fx.array());
+
+  return (grad_fx.array());
 }
+
+
+//' evd_dnorm_grad_stan
+//'
+//' This is an attempt to use stan's AD features to calculate a gradient
+//' for the RSSp likelihood
+//'
+//' @template RSSp_stat
+//' @export
+//[[Rcpp::export]]
+double evd_dnorm_stan(const MapA par,const MapA D, const MapA quh){
+
+    double fx=0;
+
+
+  // param(0)=varu;
+  // param(1)=a;
+  // Rcpp::Rcout<<"param:"<<param<<std::endl;
+
+
+  int num_terms=par.size();
+  evd_dens f(D,quh,num_terms);
+  //  Rcpp::Rcout<<"Struct constructed!"<<std::endl;
+  Eigen::Matrix<double,Eigen::Dynamic,1> param(par);
+  Eigen::Matrix <double,Eigen::Dynamic,1> grad_fx;
+  stan::math::gradient(f,param,fx,grad_fx);
+
+  return (fx);
+
+}
+
+  //  Rcpp::Rcout<<"Gradient computed!"<<std::endl;
+
+//};
 
 
 //' evd_dnorm_hess_stan
@@ -184,13 +236,15 @@ Eigen::MatrixXd evd_dnorm_hess_stan(const MapA par, const MapA D,
   // param(0)=varu;
   // param(1)=a;
   // Rcpp::Rcout<<"param:"<<param<<std::endl;
-  evd_dens f(D, quh);
+  evd_dens f(D, quh,par.size());
   //  Rcpp::Rcout<<"Struct constructed!"<<std::endl;
   stan::math::hessian(f, param, fx, grad_fx, H_fx);
   //  Rcpp::Rcout<<"Gradient computed!"<<std::endl;
 
   return (H_fx);
 }
+
+
 
 
 
@@ -283,3 +337,33 @@ double estimate_pve(const MapA cvec,  const MapA D,const MapA quh,int sample_siz
   default: { Rcpp::stop("too many confounding terms!"); }
   }
 }
+
+
+
+template <int I>
+struct do_transformation_impl {
+  template<int M>
+  static auto run(const Eigen::Array<double,M,1> &short_vec, const Eigen::ArrayXd &long_vec)
+    -> decltype(short_vec(I)*long_vec.pow(2-I) + do_transformation_impl<I-1>::run(short_vec,long_vec))
+    {
+      return short_vec(I)*long_vec.pow(2-I) + do_transformation_impl<I-1>::run(short_vec,long_vec);
+    }
+};
+
+template <>
+struct do_transformation_impl<0> {
+  template<int M>
+  static auto run(const Eigen::Array<double,M,1> &short_vec, const Eigen::ArrayXd &long_vec)
+    -> decltype(short_vec(0)*long_vec.pow(2))
+    {
+      return short_vec(0)*long_vec.pow(2);
+    }
+};
+
+template<int N>
+auto do_transformation(const Eigen::Array<double,N,1> &short_vec, const Eigen::ArrayXd &long_vec)
+  -> decltype(do_transformation_impl<N-1>::run(short_vec,long_vec))
+  {
+    return do_transformation_impl<N-1>::run(short_vec,long_vec);
+  }
+
