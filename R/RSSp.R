@@ -84,12 +84,12 @@ gen_trait_uuid <- function(){
 #' @param sample_size
 #' @param trait_id
 #' @param pve_bounds
-#' @param doConfound
-#' @param a_bounds
+#' @param nterms
 #' @param eigenvalue_cutoff
 #' @param calc_H
-#' @param calc_var
 #' @param alt_pve
+#' @param useGradient
+#' @param save_data
 #' @export
 RSSp_estimate <- function(quh,
                           D,
@@ -99,7 +99,7 @@ RSSp_estimate <- function(quh,
                           nterms=1,
                           eigenvalue_cutoff=1e-3,
                           calc_H=F,
-                          alt_pve=F,useGradient=T){
+                          alt_pve=F,useGradient=T,save_data=FALSE){
   #useGradient <- T
   p <- sum(D)
   quh <- quh[D>eigenvalue_cutoff]
@@ -136,12 +136,14 @@ RSSp_estimate <- function(quh,
   }
   pve=estimate_pve(cvec=par_ret,D = D,quh=quh,sample_size = sample_size)
   
-  retdf <- tibble::data_frame(sigu=siguv,bias=list(tibble::data_frame(term_no=seq_along(par_ret[-1]),value=par_ret[-1])),lnZ=lnzv,data=list(data_frame(quh=quh,D=D)),
+  retdf <- tibble::data_frame(sigu=siguv,bias=list(tibble::data_frame(term_no=seq_along(par_ret[-1]),value=par_ret[-1])),lnZ=lnzv,
                               convergence=conv,
                               trait_id=as.character(trait_id),
                               nterms=nterms,
                               pve=pve)
-  
+    if(save_data){
+        retdf <- mutate(retdf,data=list(data_frame(quh=quh,D=D)))
+        }
   if(calc_H){
       Hmat <- ldat$hessian
       if(nterms>1){
@@ -162,7 +164,6 @@ RSSp_estimate <- function(quh,
   if(alt_pve){
     retdf <- mutate(retdf,alt_pve=p_n*sigu^2)
   }
-  class(retdf) <- "rssp"
   return(retdf)
 }
 
