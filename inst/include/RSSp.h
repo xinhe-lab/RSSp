@@ -4,6 +4,7 @@
 // #pragma GCC diagnostic ignored "-Wdeprecated-declarations" 
 
 #include <RcppEigen.h>
+
 typedef Eigen::Map<Eigen::ArrayXd>  MapA;
 typedef Eigen::Map<Eigen::MatrixXd> MapMat;
 typedef Eigen::Map<Eigen::VectorXd> MapVec;
@@ -14,5 +15,11 @@ typedef Eigen::Ref<Eigen::ArrayXd>  RefA;
 
 typedef const Eigen::Ref<const Eigen::VectorXd> ConstVec;
 typedef const Eigen::Ref<const Eigen::ArrayXd> ConstA;
+
+
+
+
+
+
 
 #endif

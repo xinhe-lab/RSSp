@@ -12,7 +12,7 @@ If the model does not include confounding, `par` can be a length one vector.}
 
 \item{quh}{The precomputed matrix vector product `crossprod(Q,u_hat)` (passed as a  length `p` vector)}
 
-\item{dvec.}{The eigenvalues of the LD matrix, passed as a length `p` vector}
+\item{D.}{The eigenvalues of the LD matrix, passed as a length `p` vector}
 }
 \description{
 Compute the negative of the marginalized RSSp log-likelihood

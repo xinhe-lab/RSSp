@@ -6,7 +6,8 @@
 \usage{
 RSSp_estimate(quh, D, sample_size = NULL, trait_id = gen_trait_uuid(),
   pve_bounds = c(.Machine$double.eps, 1 - .Machine$double.eps),
-  nterms = 1, eigenvalue_cutoff = 0.001, calc_H = F, alt_pve = F)
+  nterms = 1, p = sum(D), eigenvalue_cutoff = 0.001, calc_H = F,
+  alt_pve = F, useGradient = T, save_data = FALSE)
 }
 \description{
 Estimate heritability using RSSp

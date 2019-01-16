@@ -97,11 +97,11 @@ RSSp_estimate <- function(quh,
                           trait_id=gen_trait_uuid(),
                           pve_bounds=c(.Machine$double.eps,1-.Machine$double.eps),
                           nterms=1,
+                          p=sum(D),
                           eigenvalue_cutoff=1e-3,
                           calc_H=F,
                           alt_pve=F,useGradient=T,save_data=FALSE){
   #useGradient <- T
-  p <- sum(D)
   quh <- quh[D>eigenvalue_cutoff]
   D <- D[D>eigenvalue_cutoff]
   #data_df <- data_frame(quh=quh,D=D) %>% dplyr::filter(D>eigenvalue_cutoff)

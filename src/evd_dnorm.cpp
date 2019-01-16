@@ -13,60 +13,66 @@ template<typename T> struct ParamArray{
 };
 
 
-template<int N>
-double t_evd_dnorm(const Eigen::Array<double,N,1> cvec, const MapA D, const MapA quh);
 
 
-template<int N>
-double t_evd_dnorm(const Eigen::Array<double,N,1> cvec ,const MapA D, const MapA quh){
-  const double p=static_cast<double>(D.size());
-  double tot_sum=0;
+
+template<typename T>
+T t_evd_dnorm(const Eigen::Array<T,Eigen::Dynamic,1> cvec ,const MapA D, const MapA quh){
+  using std::log;
+  const int N=cvec.size();
+  const T p=static_cast<T>(D.size());
+  T tot_sum=0;
   for(int i=0; i<p; i++){
-    double tvar=D[i];
+    T tvar=D[i];
     for (int k = 0; k < N; k++) {
       tvar += cvec[k] * std::pow(D[i], 2 - k);
     }
-    tot_sum += std::log(tvar) + (quh[i] * quh[i]) / tvar;
+    tot_sum += log(tvar) + (quh[i] * quh[i]) / tvar;
   }
   return -(-0.5 * (tot_sum)-0.5 * p * log(2 * M_PI));
 }
 
-template<>
-double t_evd_dnorm<1>(const Eigen::Array<double,1,1> cvec, const MapA D, const MapA quh){
+template<typename T>
+T t_evd_dnorm(const T cvec, const MapA D, const MapA quh){
+  using std::log;
   //  Rcpp::Rcout<<"1"<<std::endl;
-  const double p=static_cast<double>(D.size());
-  const double tsum = ((D*D*cvec[0]+D).log()+ (quh*(1/(D*D*cvec[0]+D))*quh)).sum();
+  const T p=static_cast<T>(D.size());
+  const T tsum = ((cvec*D.square()+D).log()+ (quh.square()*(1/(cvec*D.square()+D)))).sum();
   return -(-0.5*(tsum)-0.5*p*log(2*M_PI));
 }
 
-template <>
-double t_evd_dnorm<2>(const Eigen::Array<double, 2, 1> cvec, const MapA D,
+template<typename T>
+T t_evd_dnorm(const Eigen::Array<T, 2, 1> cvec, const MapA D,
                       const MapA quh) {
+  using std::log;
   //  Rcpp::Rcout<<"2"<<std::endl;
-  const double p = static_cast<double>(D.size());
-  const double tsum =
+  const T p = static_cast<T>(D.size());
+  const T tsum =
       ((D + cvec[0] * D.square() + cvec[1] * D).log() +
        (quh * (1 / (D + cvec[0] * D.square() + cvec[1] * D)) * quh))
           .sum();
   return -(-0.5 * (tsum)-0.5 * p * log(2 * M_PI));
 }
 
-template<>
-double t_evd_dnorm<3>(const Eigen::Array<double,3,1> cvec, const MapA D, const MapA quh){
+template<typename T>
+T t_evd_dnorm(const Eigen::Array<T,3,1> cvec, const MapA D, const MapA quh){
+  using std::log;
   //  Rcpp::Rcout<<"3"<<std::endl;
-  const double p=static_cast<double>(D.size());
-  const double tsum =          (D+cvec[0]*D.square()+cvec[1]*D+cvec[2]).log().sum();
-  const double tprod = (quh*(1/(D+cvec[0]*D.square()+cvec[1]*D+cvec[2]))*quh).sum();
+  const T p=static_cast<T>(D.size());
+  const T tsum =          (D+cvec[0]*D.square()+cvec[1]*D+cvec[2]).log().sum();
+  const T tprod = (quh*(1/(D+cvec[0]*D.square()+cvec[1]*D+cvec[2]))*quh).sum();
   return -(-0.5*(tsum+tprod)-0.5*p*log(2*M_PI));
 }
 
 
-template<>
-double t_evd_dnorm<4>(const Eigen::Array<double,4,1> cvec, const MapA D, const MapA quh){
+
+template<typename T>
+T t_evd_dnorm(const Eigen::Array<T,4,1> cvec, const MapA D, const MapA quh){
+  using std::log;
   //  Rcpp::Rcout<<"4"<<std::endl;
-  const double p=static_cast<double>(D.size());
-  const double tsum =          (D+cvec[0]*D.square()+cvec[1]*D+cvec[2]+cvec[3]*D.pow(-1)).log().sum();
-  const double tprod = (quh*(1/(D+cvec[0]*D.square()+cvec[1]*D+cvec[2]+cvec[3]*D.pow(-1)))*quh).sum();
+  const T p=static_cast<T>(D.size());
+  const T tsum =          (D+cvec[0]*D.square()+cvec[1]*D+cvec[2]+cvec[3]*D.pow(-1)).log().sum();
+  const T tprod = (quh*(1/(D+cvec[0]*D.square()+cvec[1]*D+cvec[2]+cvec[3]*D.pow(-1)))*quh).sum();
   return -(-0.5*(tsum+tprod)-0.5*p*log(2*M_PI));
 }
 
@@ -84,7 +90,7 @@ double evd_dnorm(const MapA par, const MapA D, const MapA quh) {
   const int num_param=par.size();
   switch(num_param){
   case 1:{
-    Eigen::Array<double,1,1> tcvec(par);
+    double tcvec=par[0];
     return(t_evd_dnorm(tcvec,D,quh));
   }
   case 2:{
@@ -101,7 +107,7 @@ double evd_dnorm(const MapA par, const MapA D, const MapA quh) {
     return(t_evd_dnorm(tcvec,D,quh));
   }
   case 5:{
-    Eigen::Array<double,5,1> tcvec(par);
+    Eigen::Array<double,Eigen::Dynamic,1> tcvec(par);
     return(t_evd_dnorm(tcvec,D,quh));
   }
   default: { Rcpp::stop("too many confounding terms!"); }
@@ -110,6 +116,20 @@ double evd_dnorm(const MapA par, const MapA D, const MapA quh) {
 
 //Borrowed heavily from https://arxiv.org/pdf/1509.07164.pdf
 
+
+
+
+  // int num_terms=par.size();
+  // evd_dens f(D,quh,num_terms);
+  // //  Rcpp::Rcout<<"Struct constructed!"<<std::endl;
+  // Eigen::Matrix<double,Eigen::Dynamic,1> param(par);
+  // Eigen::Matrix <double,Eigen::Dynamic,1> grad_fx;
+  // stan::math::gradient(f,param,fx,grad_fx);
+
+  // return (grad_fx.array());
+
+
+
 struct evd_dens {
   const MapA D;
   const MapA quh;
@@ -117,33 +137,11 @@ struct evd_dens {
   const size_t N;
   evd_dens(const MapA D_,const MapA quh_,const size_t N_): D(D_),quh(quh_),p(quh.size()),N(N_){}
   template <typename T>
-  T operator()(const Eigen::Matrix<T,Eigen::Dynamic,1> &theta) const{
-    const T p=static_cast<T>(D.size());
-    T tot_sum=0;
-    for(int i=0; i<p; i++){
-      T tvar=D[i];
-      for (int k = 0; k < N; k++) {
-        tvar += theta[k] * std::pow(D[i], 2 - k);
-      }
-      tot_sum += log(tvar) + (quh[i] * quh[i]) / tvar;
-    }
-    return -(-0.5 * (tot_sum)-0.5 * p * log(2 * M_PI));
+  T operator()(const Eigen::Matrix<T,Eigen::Dynamic,1> &par) const{
+      Eigen::Array<T,Eigen::Dynamic,1> tcvec(par);
+      return(t_evd_dnorm(tcvec,D,quh));
   }
-
-  //   const double p=static_cast<double>(D.size());
-  //   const size_t N=theta.size();
-  //   T tot_sum=0;
-  //   for(int i=0; i<p; i++){
-  //     T tvar=D[i];
-  //     for (int k = 0; k < N; k++) {
-  //       tvar += theta[k] * D[i] * std::pow(D[i], 2 - k);
-  //     }
-  //     tot_sum += log(tvar) + (quh[i] * quh[i]) / tvar;
-  //   }
-  //   return -0.5 * (tot_sum)-0.5 * p * log(2 * M_PI);
-  // }
 };
-
 
 
 
@@ -162,12 +160,6 @@ Eigen::ArrayXd evd_dnorm_grad_stan(const MapA par,const MapA D, const MapA quh){
   // const double a=par(1);
   // Rcpp::Rcout<<"sigu is :"<<sigu<<std::endl;
   double fx=0;
-
-
-  // param(0)=varu;
-  // param(1)=a;
-  // Rcpp::Rcout<<"param:"<<param<<std::endl;
-
 
   int num_terms=par.size();
   evd_dens f(D,quh,num_terms);
@@ -191,12 +183,6 @@ Eigen::ArrayXd evd_dnorm_grad_stan(const MapA par,const MapA D, const MapA quh){
 double evd_dnorm_stan(const MapA par,const MapA D, const MapA quh){
 
     double fx=0;
-
-
-  // param(0)=varu;
-  // param(1)=a;
-  // Rcpp::Rcout<<"param:"<<param<<std::endl;
-
 
   int num_terms=par.size();
   evd_dens f(D,quh,num_terms);
@@ -225,8 +211,7 @@ double evd_dnorm_stan(const MapA par,const MapA D, const MapA quh){
 Eigen::MatrixXd evd_dnorm_hess_stan(const MapA par, const MapA D,
                                     const MapA quh) {
   //  Rcpp::Rcout<<"Function started!"<<std::endl;
-  const double varu = par(0);
-  const double a = par(1);
+
   // Rcpp::Rcout<<"sigu is :"<<sigu<<std::endl;
   double fx = 0;
   Eigen::Matrix<double, Eigen::Dynamic, 1> grad_fx;

@@ -4,4 +4,5 @@
 .Ruserdata
 src/*.o
 src/*.so
+.ccls
 src/*.dll

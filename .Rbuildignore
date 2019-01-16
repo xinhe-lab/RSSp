@@ -3,3 +3,7 @@
 ^data-raw$
 ^\.travis\.yml$
 ^codecov\.yml$
+^src/\.clang-format$
+^src/.*o$
+^README\.Rmd$
+
