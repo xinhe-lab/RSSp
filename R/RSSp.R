@@ -1,39 +1,6 @@
 
 
 
-##' .. content for \description{} (no empty lines) ..
-##'
-##' .. content for \details{} ..
-##' @title
-##' @param D_df
-##' @param pvv
-##' @param add_region_id
-##' @return
-##' @author Nicholas Knoblauch \email{nwknoblauch@@gmail.com}
-filter_pvv <- function(D_df,pvv=0,add_region_id=F){
-  if(pvv==0){
-    return(D_df)
-  }
-  stopifnot(!is.null(D_df$D))
-  if(is.null(D_df[["rel_D"]])){
-    if(is.null(D_df$region_id)){
-        if(add_region_id){
-            D_df <- dplyr::mutate(D_df,region_id=1)
-        }else{
-            stop("column `region_id` missing from D_df, (use `add_region_id=TRUE` to use only one block)")
-        }
-    }
-    stopifnot(!is.null(D_df$region_id))
-    D_df <- dplyr::group_by(D_df,region_id) %>% arrange(desc(D)) %>% 
-    dplyr::mutate(rel_D=D/sum(D)) %>% ungroup()
-  }
-  stopifnot(!is.null(D_df[["rel_D"]]))
-  ret_df <- D_df %>% dplyr::filter(rel_D>=pvv) %>%
-    dplyr::ungroup()
-  stopifnot(nrow(ret_df)>0)
-  return(ret_df)
-}
-
 
 ##' .. content for \description{} (no empty lines) ..
 ##'
@@ -44,6 +11,7 @@ filter_pvv <- function(D_df,pvv=0,add_region_id=F){
 ##' @param add_region_id
 ##' @return
 ##' @author
+##' @export
 filter_normD <- function(D_df,normD=0,add_region_id=F){
   if(pvv==0){
     return(D_df)
@@ -66,9 +34,6 @@ filter_normD <- function(D_df,normD=0,add_region_id=F){
   stopifnot(nrow(ret_df)>0)
   return(ret_df)
 }
-
-
-
 
 
 
@@ -100,15 +65,22 @@ RSSp_estimate <- function(quh,
                           p=sum(D),
                           eigenvalue_cutoff=1e-3,
                           calc_H=F,
-                          alt_pve=F,useGradient=T,save_data=FALSE){
+                          alt_pve=F,useGradient=T){
   #useGradient <- T
-  quh <- quh[D>eigenvalue_cutoff]
+  if(NCOL(quh)>1){
+    quh <- quh[D>eigenvalue_cutoff,]
+  }else{
+    quh <- quh[D>eigenvalue_cutoff]
+  }
   D <- D[D>eigenvalue_cutoff]
   #data_df <- data_frame(quh=quh,D=D) %>% dplyr::filter(D>eigenvalue_cutoff)
-  stopifnot(length(quh)>0,length(quh)==length(D),all(D>0))
+  stopifnot(NROW(quh)>0,NROW(quh)==length(D),all(D>0))
   #stopifnot(all(data_df$D>0))
-  p_n <- p/sample_size
-  # stopifnot(length(p_n)==1,!is.null(p_n))
+  sample_size <- unique(sample_size)
+  stopifnot(length(sample_size)==1)
+  p <- unique(p)
+  p_n <- (p/sample_size)
+   stopifnot(length(p_n)==1,!is.null(p_n))
   varu_bound_mat <- replicate(nterms,calc_varu(pve_bounds,p_n))
   #sigu_bound_mat <- calc_sigu(pve_bounds,p_n)
   stopifnot(dim(varu_bound_mat)==c(2,nterms))
@@ -136,34 +108,12 @@ RSSp_estimate <- function(quh,
   }
   pve=estimate_pve(cvec=par_ret,D = D,quh=quh,sample_size = sample_size)
   
-  retdf <- tibble::data_frame(sigu=siguv,bias=list(tibble::data_frame(term_no=seq_along(par_ret[-1]),value=par_ret[-1])),lnZ=lnzv,
+  
+  retdf <- tibble::tibble(sigu=siguv,bias=list(tibble::data_frame(term_no=seq_along(par_ret[-1]),value=par_ret[-1])),lnZ=lnzv,
                               convergence=conv,
                               trait_id=as.character(trait_id),
                               nterms=nterms,
                               pve=pve)
-    if(save_data){
-        retdf <- mutate(retdf,data=list(data_frame(quh=quh,D=D)))
-        }
-  if(calc_H){
-      Hmat <- ldat$hessian
-      if(nterms>1){
-          Hvar <- purrr::possibly(solve,otherwise = matrix(NA_real_,nterms,nterms))(Hmat)/sqrt(length(D))
-          # sigu_var_h <- Hvar[1,1]
-          # bias_var_h <- Hvar[2,2]
-          # sigu_bias_cov_h <- Hvar[1,2]
-      }else{
-          Hvar <- (1/(Hmat))/sqrt(length(D))
-          # sigu_var_h <- Hvar[1,1]
-          # bias_var_h <- 0
-          # sigu_bias_cov_h <- 0
-      }
-      H_det <- det(Hmat)
-      retdf <- dplyr::mutate(retdf,H_var=list(Hvar),H_mat=list(Hmat),H_det=H_det)
-  }
-
-  if(alt_pve){
-    retdf <- mutate(retdf,alt_pve=p_n*sigu^2)
-  }
   return(retdf)
 }
 

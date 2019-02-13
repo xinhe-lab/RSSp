@@ -48,7 +48,8 @@ test_that("We can estimate the right answer with no confounding and direct simul
   
   p <- 1e3
   g <- 1000
-  D <- runif(p)/runif(p)  
+  D <- runif(p)/runif(p)
+  D <- D/(sum(D)/p)
   N <- 1e6
   pvevec <- 0.5
   parvec <- RSSp:::calc_varu(pve = pvevec,p_n=sum(D)/N)
@@ -57,7 +58,7 @@ test_that("We can estimate the right answer with no confounding and direct simul
   # oquh <- rnorm(n = p)
   for(i in 1:g){
     quh <- rnorm(p,mean=0,sd=sqrt(pvevec*(D*D)+D))
-    result <- RSSp_estimate(quh,D,N,nterms = 1,calc_H = T)
+    result <- RSSp_estimate(quh,D,sample_size = N,nterms = 2,calc_H = T)
     rvec[i] <- result$pve
     pb$tick()
   }
@@ -77,8 +78,6 @@ test_that("We can estimate the right answer with no confounding and direct simul
                simple_log_likelihood(quh,ts))
   expect_equal(-sum(dnorm(quh,mean=0,sd=sqrt(D^2*par+D)),log=T),
                evd_dnorm_t(par,D,quh))
-  
-  
 })
 
 

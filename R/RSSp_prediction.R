@@ -1,46 +1,49 @@
-
-posterior_mean_u <- function(sigu,dvec,Q,quh){
-  varu <- sigu^2
-  # p_D <- (dvec*varu)/(a+dvec*dvec*varu+dvec)
-  p_D <- 1/(dvec+1/varu)
-  return(Q%*%(p_D*quh))
-}
-
-posterior_mean_v <- function(sigu,dvec,quh){
-  return((1/(dvec+1/(sigu^2)))*quh)
-}
-
-
-posterior_mean_beta <- function(sigu,dvec,se,Q,quh){
-  return(se*posterior_mean_u(sigu,dvec,Q,quh))
-}
-
-
-estimate_pve <- function(dvec,quh,cvec,N,n_samples=0){
+#' Function for simulating "true" orthogonalized effects given eigenvalues and PVE parameters
+simulate_v <- function(cvec,D){
   
-  num_c <- length(cvec)
-  
-  if(num_c>1){
-    stop("multiple cvec terms not yet implemented")
+  p <- length(D)
+  k <- length(cvec)
+  dvar <- numeric(p)
+  for (i in 1:k) {
+    dvar <- dvar + cvec[i]*D^( - ( i - 1))
   }
-  if(n_samples!=0){
-    stop("sampling based pve estimate not yet implemented")
-  }
-  # lambda_init <- 0
-  
-  
-  tmp <- 1+1/(cvec*dvec)
-  rto <- (quh^2)/((dvec)^2)
-  rto <- dvec*rto
-  rto <- rto/(tmp^2)
-  
-  pve_mean <- sum(1/tmp)+sum(rto)
-  pve_mean <- pve_mean/N
-  
-  
-  return(pve_mean)
-  
+  V <- rnorm(n = p,mean = 0,sd = sqrt(dvar))
+  return(V)
 }
+
+simulate_vhat <- function(cvec,D){
+  v <- simulate_v(cvec,D)
+  p <- length(v)
+  vhat <- rnorm(p,mean = D*v,sd = sqrt(D))
+  return(vhat)
+}
+
+# 
+# estimate_pve <- function(dvec,quh,cvec,N,n_samples=0){
+#   
+#   num_c <- length(cvec)
+#   
+#   if(num_c>1){
+#     stop("multiple cvec terms not yet implemented")
+#   }
+#   if(n_samples!=0){
+#     stop("sampling based pve estimate not yet implemented")
+#   }
+#   # lambda_init <- 0
+#   
+#   
+#   tmp <- 1+1/(cvec*dvec)
+#   rto <- (quh^2)/((dvec)^2)
+#   rto <- dvec*rto
+#   rto <- rto/(tmp^2)
+#   
+#   pve_mean <- sum(1/tmp)+sum(rto)
+#   pve_mean <- pve_mean/N
+#   
+#   
+#   return(pve_mean)
+#   
+# }
 
 
 # 

@@ -8,6 +8,14 @@
 //[[Rcpp::depends(BH)]]
 using namespace Rcpp;
 
+typedef Eigen::Map<Eigen::ArrayXd>  MapA;
+typedef Eigen::Map<Eigen::MatrixXd> MapMat;
+typedef Eigen::Map<Eigen::VectorXd> MapVec;
+typedef Eigen::Ref<Eigen::VectorXd> RefVec;
+typedef Eigen::Ref<Eigen::MatrixXd> RefMat;
+typedef Eigen::Ref<Eigen::ArrayXd>  RefA;
+
+
 template<typename T> struct ParamArray{
   typedef typename Eigen::Map<Eigen::Array<double,T::value,1> > ParamType;
 };
@@ -266,22 +274,6 @@ auto pve_D(const Eigen::Array<double, N, 1> &short_vec,
   return pve_D_impl<N - 1>::run(short_vec, long_vec);
 }
 
-// template <>
-// auto pve_D<1>(const Eigen::Array<double, 1, 1> &short_vec,
-//               const Eigen::ArrayXd &long_vec)
-//     -> decltype(Eigen::ArrayXd::Zero(long_vec.size())) {
-//   return Eigen::ArrayXd::Zero(long_vec.size());
-// }
-
-// template<int N,int IB=0>
-// Eigen::ArrayXd confound_D(const Eigen::Array<double,N,1> &cvec, const MapA & D){
-//   static_assert(IB<=N,"IB must be less than N in confound_D");
-//   Eigen::ArrayXd return_vec = Eigen::ArrayXd::Zero(D.size());
-//   for(int i=IB; i<N; i++){
-//     return_vec += cvec(i)*D.pow(2-i);
-//   }
-//   return return_vec;
-// }
 
 
 template<int N>
@@ -295,6 +287,8 @@ double t_estimate_pve(const Eigen::Array<double,N,1> &cvec, const MapA D,const M
   mu_hat=sigma_hat*D*(D +pve_D<N>(cvec,D)).inverse()*quh;
   return((D*sigma_hat+mu_hat.square()*D).sum()/sample_size);
 }
+
+
 
 
 //' compute pve with confounding
