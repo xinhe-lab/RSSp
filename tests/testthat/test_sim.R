@@ -1,18 +1,5 @@
 context("simulating data")
 
-test_that("we can simulate from  2-parameter model",{
-  
-  data("panel_eigenvalues")
-  D <-  panel_eigenvalues
-  p <- length(D)
-  nterms <- 2
-  cvec <- runif(nterms)
-  quh_1 <- purrr::flatten_dbl(purrr::rerun(100,RSSp:::simulate_vhat(cvec,D)))
-  quh_2 <- rnorm(p*100,mean = 0,sd = sqrt(cvec[1]*D^2 + cvec[2]*D + D))
-  expect_equal(mean(quh_1), mean(quh_2), tolerance = 1e-1)
-  expect_equal(var(quh_1),var(quh_2), tolerance = 1e-1)
-  
-})
 
 
 test_that("we can simulate from and estimate multiparameter model",{

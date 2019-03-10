@@ -7,8 +7,9 @@ Author: Nicholas Knoblauch
 Maintainer: Nicholas Knoblauch <nwknoblauch@gmail.com>
 Description: Implementation of the Regression with Summary Statistics (RSS) method using a polygenic (normal)
 License: What license is it under?
-Imports: Rcpp (>= 0.12.12), RcppEigen (>= 0.3.3.3.0),StanHeaders,BH,magrittr,dplyr,purrr,tidyr,mvtnorm,tibble,progress
+Imports: Rcpp (>= 0.12.12), RcppEigen (>= 0.3.3.3.0),StanHeaders,BH,magrittr,dplyr,purrr,tidyr,mvtnorm,tibble,progress,ldshrink
 LinkingTo: Rcpp, RcppEigen,StanHeaders,BH
+Remotes: github::stephenslab/ldshrink
 Suggests: testthat,
     covr
 RoxygenNote: 6.1.1

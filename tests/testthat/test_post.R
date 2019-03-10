@@ -3,11 +3,13 @@ context("test posterior estimation")
 
 test_that("C++ implementation of SPVE",{
   
-  
-  p <- 4
-  quh <- rnorm(p)
-  D <- runif(p)/runif(p)  
-  par <- c(runif(1))
+  data("reference_genotype",package="ldshrink")
+  data("reference_map",package="ldshrink")
+  Rl <- ldshrink::ldshrink_evd(reference_genotype,reference_map)
+  p <- length(Rl$D)
+  quh <- t(Rl$Q)%*%rnorm(p)
+  D <-Rl$D  
+  par <- 1
   N <- 100
   
   R_estimate_pve <- function(cvec,D,quh,N,n_samples=0){
@@ -38,14 +40,6 @@ test_that("C++ implementation of SPVE",{
   
   expect_equal(R_estimate_pve(par,D = D,quh = quh,N = N,n_samples = 0),
                estimate_pve(cvec = par,D = D,quh = quh,sample_size =N))
-  
-  # 
-  # spve_R <- function(R,b,bh,se,n){
-  #   tbh <- b/sqrt(n*se+bh^2)
-  #   return(sum((tb%o%tb)*R))
-  # }
-  
-  
 })
 
 

@@ -37,7 +37,7 @@ T t_evd_dnorm(const Eigen::Array<T,Eigen::Dynamic,1> cvec ,const MapA D, const M
     }
     tot_sum += log(tvar) + (quh[i] * quh[i]) / tvar;
   }
-  return -(-0.5 * (tot_sum)-0.5 * p * log(2 * M_PI));
+  return -(-0.5 * (tot_sum) -0.5 * p * log(2 * M_PI));
 }
 
 template<typename T>
@@ -103,7 +103,6 @@ double evd_dnorm(const MapA par, const MapA D, const MapA quh) {
   }
   case 2:{
     Eigen::Array<double,2,1> tcvec(par);
-    return(t_evd_dnorm(tcvec,D,quh));
     return(t_evd_dnorm(tcvec,D,quh));
   }
   case 3:{
