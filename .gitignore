@@ -6,5 +6,5 @@ compile_commands.json
 .dir-locals.el
 src/*.o
 src/*.so
-.ccls
+inst/old_analyses/*
 src/*.dll
