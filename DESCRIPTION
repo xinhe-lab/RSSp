@@ -5,8 +5,8 @@ Version: 0.9
 Date: 2017-08-07
 Author: Nicholas Knoblauch
 Maintainer: Nicholas Knoblauch <nwknoblauch@gmail.com>
-Description: Implementation of the Regression with Summary Statistics (RSS) method using a polygenic (normal)
-License: What license is it under?
+Description: Implementation of the Regression with Summary Statistics (RSS) method using a polygenic (normal) prior.  RSSp uses GWAS summary statistics and a (external) reference LD panel to estiamte heritability for quantitative traits
+License: GPL-3
 Imports: Rcpp (>= 0.12.12), RcppEigen (>= 0.3.3.3.0),StanHeaders,BH,magrittr,dplyr,purrr,tidyr,mvtnorm,tibble,progress,ldshrink
 LinkingTo: Rcpp, RcppEigen,StanHeaders,BH
 Remotes: github::stephenslab/ldshrink

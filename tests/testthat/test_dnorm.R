@@ -82,7 +82,7 @@ test_that("We can estimate the right answer with no confounding and direct simul
   # oquh <- rnorm(n = p)
   for(i in 1:g){
     quh <- rnorm(p,mean=0,sd=sqrt(parvec*(D*D)+D))
-    result <- RSSp_estimate(quh,D,sample_size = N,nterms = 1,calc_H = F)
+    result <- RSSp_estimate(quh,D,sample_size = N,nterms = 1)
     rvec[i] <- result$pve
     pb$tick()
   }
