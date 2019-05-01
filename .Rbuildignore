@@ -1,3 +1,4 @@
+^LICENSE\.md$
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^data-raw$
@@ -6,4 +7,8 @@
 ^src/\.clang-format$
 ^src/.*o$
 ^README\.Rmd$
-
+^compile_commands.json
+^.dir-locals.el
+^inst/old_analyses
+^.ccls
+^.clang-tidy

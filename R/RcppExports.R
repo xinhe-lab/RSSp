@@ -11,9 +11,10 @@ evd_dnorm <- function(par, D, quh) {
 }
 
 #' evd_dnorm_grad_stan
+#' 
 #'
-#' This is an attempt to use stan's AD features to calculate a gradient
-#' for the RSSp likelihood
+#' This is an attempt to use stan's AD features to optimize the RSSp likelihood
+#'
 #'
 #' @template RSSp_stat
 #' @export

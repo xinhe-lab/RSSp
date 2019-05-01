@@ -2,6 +2,7 @@
 #' @param uhat a vector of length `p` containing marginal association Z scores.  Alternatively, a  matrix with `p` rows, each column
 #' representing marginal association with a different trait
 #' @param Q A `q` by `p` matrix consisting of `q` eigenvectors of the LD matrix computed at p loci.
+#' @export
 convert_quh <- function(uhat,Q){
     if(NCOL(uhat)>1)
         return(crossprod(Q,uhat))
@@ -9,7 +10,7 @@ convert_quh <- function(uhat,Q){
 }
 
 #' Convert chunks of summary statistics to PC-space
-#' @param chunklist a vector or list specifying LD regions. each elemenent of chunklist will be passed to `uhat_uf` and
+#' @param chunklist a vector or list specifying LD regions. each elemenent of chunklist will be passed to `uhat_uf` and `q_uf`
 #' @param uhat_uf a function that takes a single element of `chunklist` and returns either a length p vector, or a matrix with p rows
 #' @param Q_uf a function that takes a single element of `chunklist` and returns a `q` by `p` matrix
 map_convert_quh <- function(chunklist,uhat_uf,q_uf,map_fun=purrr::map,...){
@@ -25,6 +26,7 @@ map_convert_quh <- function(chunklist,uhat_uf,q_uf,map_fun=purrr::map,...){
 #' @param uh uhat a vector of length `p` containing marginal association Z scores.  Alternatively, a  matrix with `p` rows, each column
 #' representing marginal association with a different trait
 #' @param chunklist a vector of length p indicating which chunk each locus is assigned to
+#' @export
 gensplit_uh_uf <- function(uh,region_id){
 
     sf <- ifelse(NCOL(uh)>1,split.data.frame,split)
@@ -45,8 +47,6 @@ gensplit_uh_uf <- function(uh,region_id){
 #'
 #'
 #' @return a vector of length equal to `length(D)` where each element represents the estimated variance contributed by the indicated (i-th) component
-#'
-#' @examples
 #'
 transform_D <- function(cvec,D,i=1){
     stopifnot(length(i)==1,
@@ -70,27 +70,3 @@ post_var_D <- function(cvec, D, ind=seq_along(cvec)){
 
 }
 
-
-# estimate_pve <- function(cvec,D,quh,N,n_samples=0){
-# 
-#   num_c <- length(cvec)
-# 
-#   if(num_c>1){
-#     stop("multiple cvec terms not yet implemented")
-#   }
-#   if(n_samples!=0){
-#     stop("sampling based pve estimate not yet implemented")
-#   }
-#   # lambda_init <- 0
-#   tmp <- 1+1/(cvec*D)
-#   rto <- (quh^2)/((D)^2)
-#   rto <- D*rto
-#   rto <- rto/(tmp^2)
-# 
-#   pve_mean <- sum(1/tmp)+sum(rto)
-#   pve_mean <- pve_mean/N
-# 
-# 
-#   return(pve_mean)
-# 
-# }

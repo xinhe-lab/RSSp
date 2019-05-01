@@ -2,6 +2,8 @@
 .Rhistory
 .RData
 .Ruserdata
+compile_commands.json
+.dir-locals.el
 src/*.o
 src/*.so
 .ccls

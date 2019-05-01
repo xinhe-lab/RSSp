@@ -19,6 +19,3 @@ a vector of length equal to `length(D)` where each element represents the estima
 \description{
 Internal helper function for components of the confounding model
 }
-\examples{
-
-}

@@ -154,9 +154,10 @@ struct evd_dens {
 
 
 //' evd_dnorm_grad_stan
+//' 
 //'
-//' This is an attempt to use stan's AD features to calculate a gradient
-//' for the RSSp likelihood
+//' This is an attempt to use stan's AD features to optimize the RSSp likelihood
+//'
 //'
 //' @template RSSp_stat
 //' @export
@@ -167,16 +168,17 @@ Eigen::ArrayXd evd_dnorm_grad_stan(const MapA par,const MapA D, const MapA quh){
   // const double a=par(1);
   // Rcpp::Rcout<<"sigu is :"<<sigu<<std::endl;
   double fx=0;
-
+  
   int num_terms=par.size();
   evd_dens f(D,quh,num_terms);
   //  Rcpp::Rcout<<"Struct constructed!"<<std::endl;
   Eigen::Matrix<double,Eigen::Dynamic,1> param(par);
   Eigen::Matrix <double,Eigen::Dynamic,1> grad_fx;
   stan::math::gradient(f,param,fx,grad_fx);
-
+  
   return (grad_fx.array());
 }
+
 
 
 //' evd_dnorm_grad_stan

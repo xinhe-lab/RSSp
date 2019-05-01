@@ -15,6 +15,5 @@ If the model does not include confounding, `par` can be a length one vector.}
 \item{D.}{The eigenvalues of the LD matrix, passed as a length `p` vector}
 }
 \description{
-This is an attempt to use stan's AD features to calculate a gradient
-for the RSSp likelihood
+This is an attempt to use stan's AD features to optimize the RSSp likelihood
 }

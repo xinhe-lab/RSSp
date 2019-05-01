@@ -7,7 +7,7 @@
 map_convert_quh(chunklist, uhat_uf, q_uf, map_fun = purrr::map, ...)
 }
 \arguments{
-\item{chunklist}{a vector or list specifying LD regions. each elemenent of chunklist will be passed to `uhat_uf` and}
+\item{chunklist}{a vector or list specifying LD regions. each elemenent of chunklist will be passed to `uhat_uf` and `q_uf`}
 
 \item{uhat_uf}{a function that takes a single element of `chunklist` and returns either a length p vector, or a matrix with p rows}
 

@@ -14,8 +14,7 @@ test_that("likelihood is approximately equal to transliterated MATLAB",{
     retM <- negtwo_loglik(vhat = quh,dvec = D,cvec = par)
     expect_equal(retR,retM/2)
   }
-  
-  
+
 })
 
 test_that("fancy templated likelihood works like toy R version with confounding",{
@@ -96,6 +95,19 @@ test_that("We can estimate the right answer with no confounding and direct simul
   #   geom_smooth(method="lm")+
   #   geom_abline(intercept=0,slope=1)
 })
+# testthat::test_that("rssp is consistent with Xiang's implementation",{
+#  res_data <- readRDS("inst/rand_seed_312_k_1_rep_100.RDS")
+# tot_res <- map2_dfr(array_branch(res_data$vhat,margin = 2),
+#          array_branch(res_data$dvec,margin = 2),~RSSp::RSSp_estimate(.x,.y,sample_size = 1000,pve_bounds = c(.Machine$double.eps,8000)))      
+# expect_equal(c(res_data$obj*2),tot_res$lnZ)
+#   res_data$vhat
+#   res_data$dv2
+# par_l <- transpose(list(quh=array_branch(res_data$vhat,margin = 2),
+#          dvec=array_branch(res_data$dvec,margin = 2),
+#      par=res_data$par))
+# pm_db <- map_dbl(par_l,~estimate_pve(cvec=.x$par,D=.x$dvec,quh = .x$quh,sample_size = 1000))
+# expect_equal(pm_db,c(res_data$pve))
+# })
 
 
 testthat::test_that("stan likelihood works like R likelihood",{

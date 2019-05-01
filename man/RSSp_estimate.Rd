@@ -6,9 +6,25 @@
 \usage{
 RSSp_estimate(quh, D, sample_size = NULL, trait_id = gen_trait_uuid(),
   pve_bounds = c(.Machine$double.eps, 1 - .Machine$double.eps),
-  nterms = 1, p = sum(D), eigenvalue_cutoff = 0.001, calc_H = F,
-  alt_pve = F, useGradient = T, save_data = FALSE)
+  nterms = 1, p = sum(D), useGradient = T)
+}
+\arguments{
+\item{quh}{transformed summary statistics}
+
+\item{D}{vector of eigenvalues of the reference LD matrix}
+
+\item{sample_size}{sample size of GWAS}
+
+\item{trait_id}{identifier for the trait}
+
+\item{pve_bounds}{boundaries for pve estimation}
+
+\item{nterms}{number of terms in the model, by default there is one term that corresponds to heritability}
+
+\item{p}{number of variants in the dataset.  By default (and in almost all scenarios) this is the sum of the eigenvalues.}
+
+\item{useGradient}{a boolean indicating whether or not to optimize using an analytic form for the gradient.}
 }
 \description{
-Estimate heritability using RSSp
+The three most important arguments
 }
