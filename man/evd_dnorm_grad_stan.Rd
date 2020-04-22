@@ -2,12 +2,13 @@
 % Please edit documentation in R/RcppExports.R
 \name{evd_dnorm_grad_stan}
 \alias{evd_dnorm_grad_stan}
-\title{evd_dnorm_grad_stan}
+\title{Gradient for RSSp likelihood
+This is an attempt to use stan's AD features to optimize the RSSp likelihood}
 \usage{
 evd_dnorm_grad_stan(par, D, quh)
 }
 \arguments{
-\item{par}{a length 2 numeric vector.  `par[1]` corresponds to the sigma_u^2 parameter, and `par[2]` corresponds to the confounding parameter. 
+\item{par}{a (up to) length 2 numeric vector.  `par[1]` corresponds to the sigma_u^2 parameter, and `par[2]` corresponds to the confounding parameter. 
 If the model does not include confounding, `par` can be a length one vector.}
 
 \item{quh}{The precomputed matrix vector product `crossprod(Q,u_hat)` (passed as a  length `p` vector)}
@@ -15,5 +16,6 @@ If the model does not include confounding, `par` can be a length one vector.}
 \item{D.}{The eigenvalues of the LD matrix, passed as a length `p` vector}
 }
 \description{
+Gradient for RSSp likelihood
 This is an attempt to use stan's AD features to optimize the RSSp likelihood
 }

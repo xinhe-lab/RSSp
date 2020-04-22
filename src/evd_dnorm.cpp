@@ -153,12 +153,8 @@ struct evd_dens {
 
 
 
-//' evd_dnorm_grad_stan
-//' 
-//'
+//' Gradient for RSSp likelihood
 //' This is an attempt to use stan's AD features to optimize the RSSp likelihood
-//'
-//'
 //' @template RSSp_stat
 //' @export
 //[[Rcpp::export]]
@@ -293,6 +289,10 @@ double t_estimate_pve(const Eigen::Array<double,N,1> &cvec, const MapA D,const M
 
 
 //' compute pve with confounding
+//' @param cvec vector with length equal to the number of terms used to fit the model that contains parameter estimates
+//' @param D vector of eigenvalues
+//' @param quh vector of transformed summary statistics (must have length equal to quh)
+//' @param sample_size integer giving sample size of original GWAS
 //' @export
 //[[Rcpp::export]]
 double estimate_pve(const MapA cvec,  const MapA D,const MapA quh,int sample_size){

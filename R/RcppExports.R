@@ -10,12 +10,8 @@ evd_dnorm <- function(par, D, quh) {
     .Call('_RSSp_evd_dnorm', PACKAGE = 'RSSp', par, D, quh)
 }
 
-#' evd_dnorm_grad_stan
-#' 
-#'
+#' Gradient for RSSp likelihood
 #' This is an attempt to use stan's AD features to optimize the RSSp likelihood
-#'
-#'
 #' @template RSSp_stat
 #' @export
 evd_dnorm_grad_stan <- function(par, D, quh) {
@@ -45,6 +41,10 @@ evd_dnorm_hess_stan <- function(par, D, quh) {
 }
 
 #' compute pve with confounding
+#' @param cvec vector with length equal to the number of terms used to fit the model that contains parameter estimates
+#' @param D vector of eigenvalues
+#' @param quh vector of transformed summary statistics (must have length equal to quh)
+#' @param sample_size integer giving sample size of original GWAS
 #' @export
 estimate_pve <- function(cvec, D, quh, sample_size) {
     .Call('_RSSp_estimate_pve', PACKAGE = 'RSSp', cvec, D, quh, sample_size)

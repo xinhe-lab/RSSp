@@ -8,6 +8,23 @@ gen_trait_uuid <- function(){
 }
 
 
+
+
+#' Modify LD matrix 
+#'
+#' @param R LD matrix 
+#' @param z vector of z scores
+#' @param ref_sample_size reference panel size
+#'
+#' @return matrix of same dimension as D
+#' @export
+#'
+#' @examples
+modify_R <- function(R,z,ref_sample_size){
+  z_ld_weight <- 1/ref_sample_size
+  cov2cor((1-z_ld_weight) * R + z_ld_weight * tcrossprod(z))
+}
+
 #' Estimate heritability using RSSp
 #' 
 #' The three most important arguments  
@@ -20,6 +37,7 @@ gen_trait_uuid <- function(){
 #' @param nterms number of terms in the model, by default there is one term that corresponds to heritability
 #' @param p number of variants in the dataset.  By default (and in almost all scenarios) this is the sum of the eigenvalues.
 #' @param useGradient a boolean indicating whether or not to optimize using an analytic form for the gradient.  
+#'
 #' @export
 RSSp_estimate <- function(quh,
                           D,
@@ -67,7 +85,7 @@ RSSp_estimate <- function(quh,
   pve=estimate_pve(cvec=par_ret,D = D,quh=quh,sample_size = sample_size)
   
   
-  retdf <- tibble::tibble(sigu=siguv,bias=list(tibble::data_frame(term_no=seq_along(par_ret[-1]),value=par_ret[-1])),lnZ=lnzv,
+  retdf <- tibble::tibble(sigu=siguv,bias=list(tibble::tibble(term_no=seq_along(par_ret[-1]),value=par_ret[-1])),lnZ=lnzv,
                               convergence=ldat$convergence==0,
                               trait_id=as.character(trait_id),
                               nterms=nterms,

@@ -6,6 +6,15 @@
 \usage{
 estimate_pve(cvec, D, quh, sample_size)
 }
+\arguments{
+\item{cvec}{vector with length equal to the number of terms used to fit the model that contains parameter estimates}
+
+\item{D}{vector of eigenvalues}
+
+\item{quh}{vector of transformed summary statistics (must have length equal to quh)}
+
+\item{sample_size}{integer giving sample size of original GWAS}
+}
 \description{
 compute pve with confounding
 }
