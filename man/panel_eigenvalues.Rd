@@ -4,7 +4,9 @@
 \name{panel_eigenvalues}
 \alias{panel_eigenvalues}
 \title{Sample LD matrix eigenvalues}
-\format{a vector with 312 elements with sorted eigenvalues}
+\format{
+a vector with 312 elements with sorted eigenvalues
+}
 \usage{
 panel_eigenvalues
 }

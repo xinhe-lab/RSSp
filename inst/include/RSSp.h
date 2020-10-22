@@ -1,8 +1,14 @@
 #ifndef RSSP_H
 #define RSSP_H
 // #pragma GCC diagnostic ignored "-Wignored-attributes" 
-// #pragma GCC diagnostic ignored "-Wdeprecated-declarations" 
+// #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
+
+#include <stan/math/fwd/mat/fun/dot_self.hpp>    // stuff from fwd/ must come first
+#include <stan/math/mix/mat/functor/hessian.hpp> // then stuff from mix/ must come next
+#include <stan/math.hpp>                         // finally pull in everything from rev/ & prim/
+#include <Rcpp.h>
+// do this AFTER including stan/math
 #include <RcppEigen.h>
 
 typedef Eigen::Map<Eigen::ArrayXd>  MapA;

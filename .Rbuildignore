@@ -12,3 +12,5 @@
 ^inst/old_analyses
 ^.ccls
 ^.clang-tidy
+^man-roxygen$
+^man-roxygen.R

@@ -12,4 +12,4 @@ LinkingTo: Rcpp, RcppEigen,StanHeaders,BH
 Remotes: github::stephenslab/ldshrink
 Suggests: testthat,
     covr
-RoxygenNote: 6.1.1
+RoxygenNote: 7.1.0.9000

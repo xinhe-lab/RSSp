@@ -5,5 +5,5 @@
 #PKG_CPPFLAGS+= -I$(shell ${R_HOME}/bin/Rscript -e "cat(system.file(\"include\",package=\"StanHeaders\"))")
 ## With R 3.1.0 or later, you can uncomment the following line to tell R to 
 ## enable compilation with C++11 (or even C++14) where available
-CXX_STD = CXX11
+CXX_STD = CXX14
 PKG_CPPFLAGS+= -DEIGEN_NO_DEBUG  -I../inst/include -Wno-ignored-attributes -Wno-deprecated-declarations

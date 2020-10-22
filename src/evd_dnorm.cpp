@@ -1,5 +1,9 @@
+// [[Rcpp::depends(BH)]]
+// [[Rcpp::depends(RcppEigen)]]
+// [[Rcpp::depends(RcppParallel)]]
+// [[Rcpp::depends(StanHeaders)]]
 #include <RSSp.h>
-#include <boost/math/tools/promotion.hpp>
+
 #include <stan/math/prim/scal.hpp>
 #include <stan/math.hpp>
 #include <stan/math/mix/mat.hpp>
@@ -16,10 +20,7 @@ typedef Eigen::Ref<Eigen::MatrixXd> RefMat;
 typedef Eigen::Ref<Eigen::ArrayXd>  RefA;
 
 
-template<typename T> struct ParamArray{
-  typedef typename Eigen::Map<Eigen::Array<double,T::value,1> > ParamType;
-};
-
+// [[Rcpp::plugins(cpp14)]]
 
 
 

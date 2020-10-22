@@ -8,6 +8,40 @@ gen_trait_uuid <- function(){
 }
 
 
+#' Calculate PVE from sd of u and p/n
+#'
+#' @param sigu sd of u
+#' @param p_n p/n
+#'
+#' @return
+#' @export
+#'
+calc_pve <- function(sigu,p_n){
+  return(p_n*sigu^2)
+}
+
+#' calculate 
+#'
+#' @param pve pve
+#' @param p_n p/n
+#'
+#' @export
+#'
+calc_sigu <- function(pve,p_n){
+  return(sqrt(pve/p_n))
+}
+
+#' calculate variance of u from pve and p_n
+#'
+#' @param pve pve
+#' @param p_n p/n
+#'
+#' @export
+#'
+calc_varu <- function(pve,p_n){
+  return(pve/p_n)
+}
+
 
 
 #' Modify LD matrix 
@@ -91,18 +125,6 @@ RSSp_estimate <- function(quh,
                               nterms=nterms,
                               pve=pve)
   return(retdf)
-}
-
-calc_pve <- function(sigu,p_n){
-  return(p_n*sigu^2)
-}
-
-calc_sigu <- function(pve,p_n){
-  return(sqrt(pve/p_n))
-}
-
-calc_varu <- function(pve,p_n){
-  return(pve/p_n)
 }
 
 

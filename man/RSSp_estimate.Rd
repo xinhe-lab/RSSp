@@ -4,9 +4,16 @@
 \alias{RSSp_estimate}
 \title{Estimate heritability using RSSp}
 \usage{
-RSSp_estimate(quh, D, sample_size = NULL, trait_id = gen_trait_uuid(),
+RSSp_estimate(
+  quh,
+  D,
+  sample_size = NULL,
+  trait_id = gen_trait_uuid(),
   pve_bounds = c(.Machine$double.eps, 1 - .Machine$double.eps),
-  nterms = 1, p = sum(D), useGradient = T)
+  nterms = 1,
+  p = sum(D),
+  useGradient = T
+)
 }
 \arguments{
 \item{quh}{transformed summary statistics}
