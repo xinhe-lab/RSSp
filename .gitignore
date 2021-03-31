@@ -8,3 +8,6 @@ src/*.o
 src/*.so
 inst/old_analyses/*
 src/*.dll
+.Rdata
+.httr-oauth
+.DS_Store
